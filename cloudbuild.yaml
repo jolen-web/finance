@@ -4,7 +4,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/finance-tracker:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/finance-tracker:$BUILD_ID'
       - '-t'
       - 'gcr.io/$PROJECT_ID/finance-tracker:latest'
       - '-f'
@@ -15,7 +15,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/finance-tracker:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/finance-tracker:$BUILD_ID'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -30,7 +30,7 @@ steps:
       - 'deploy'
       - 'finance-tracker'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/finance-tracker:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/finance-tracker:$BUILD_ID'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -43,12 +43,12 @@ steps:
       - '--timeout'
       - '3600'
       - '--set-env-vars'
-      - 'FLASK_ENV=production,DATABASE_URL=sqlite:///instance/finance.db'
+      - 'FLASK_ENV=production,DATABASE_URL=sqlite:////tmp/finance.db,GEMINI_API_KEY=AIzaSyDUKA2cFuBE7QDIK8uH36pSHv47IfmQze0'
       - '--port'
       - '5000'
 
 images:
-  - 'gcr.io/$PROJECT_ID/finance-tracker:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/finance-tracker:$BUILD_ID'
   - 'gcr.io/$PROJECT_ID/finance-tracker:latest'
 
 options:

@@ -32,17 +32,14 @@ RUN mkdir -p /app/data /app/instance
 RUN pip install --no-cache-dir gunicorn
 
 # Create entrypoint script that initializes DB and runs the app
-RUN cat > /app/entrypoint.sh << 'EOF'
-#!/bin/bash
-set -e
-
-echo "Initializing database..."
-python init_db.py || echo "DB init script not found, skipping"
-
-echo "Starting Flask app with gunicorn..."
-exec gunicorn --bind :${PORT:-5000} --workers 4 --timeout 120 --access-logfile - --error-logfile - "run:app"
-EOF
-
-RUN chmod +x /app/entrypoint.sh
+RUN echo '#!/bin/bash' > /app/entrypoint.sh && \
+    echo 'set -e' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'echo "Initializing database..."' >> /app/entrypoint.sh && \
+    echo 'python init_db.py || echo "DB init script not found, skipping"' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'echo "Starting Flask app with gunicorn..."' >> /app/entrypoint.sh && \
+    echo 'exec gunicorn --bind :${PORT:-5000} --workers 4 --timeout 120 --access-logfile - --error-logfile - "run:app"' >> /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
 
 CMD ["/app/entrypoint.sh"]

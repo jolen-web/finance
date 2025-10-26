@@ -5,9 +5,20 @@ basedir = Path(__file__).parent.absolute()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        f'sqlite:///{basedir / "data" / "finance.db"}'
+
+    # Database configuration - use /tmp for Cloud Run (writable), otherwise use local data dir
+    if os.environ.get('FLASK_ENV') == 'production':
+        # Cloud Run: use /tmp directory which is writable
+        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:////tmp/finance.db'
+    else:
+        # Local development: use data directory
+        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+            f'sqlite:///{basedir / "data" / "finance.db"}'
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Gemini API configuration
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
     # Application settings
     ITEMS_PER_PAGE = 50
