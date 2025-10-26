@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Categorization Rules - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-list"></i> Categorization Rules</h1>
+                <p class="text-muted">Manage learned categorization patterns</p>
+            </div>
+            <a href="{{ url_for('ai_categorizer.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to AI Tools
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="filter_category" class="form-label">Category</label>
+                        <select class="form-select" id="filter_category" name="category_id">
+                            <option value="">All Categories</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}" {% if request.args.get('category_id') == category.id|string %}selected{% endif %}>
+                                    {{ category.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filter_type" class="form-label">Type</label>
+                        <select class="form-select" id="filter_type" name="type">
+                            <option value="">All Types</option>
+                            <option value="auto" {% if request.args.get('type') == 'auto' %}selected{% endif %}>Auto-Learned</option>
+                            <option value="manual" {% if request.args.get('type') == 'manual' %}selected{% endif %}>Manual</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filter_min_confidence" class="form-label">Min Confidence</label>
+                        <input type="number" class="form-control" id="filter_min_confidence" name="min_confidence"
+                               min="0" max="100" value="{{ request.args.get('min_confidence', '') }}" placeholder="0-100">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                        <a href="{{ url_for('ai_categorizer.rules') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rules Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Rules ({{ rules|length }})</h5>
+                <div>
+                    <span class="badge bg-success me-2">
+                        <i class="fas fa-robot"></i> {{ auto_learned_count }} Auto-Learned
+                    </span>
+                    <span class="badge bg-primary">
+                        <i class="fas fa-user"></i> {{ manual_count }} Manual
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if rules %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Payee Pattern</th>
+                                    <th>Category</th>
+                                    <th>Confidence</th>
+                                    <th>Usage Count</th>
+                                    <th>Type</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for rule in rules %}
+                                    <tr>
+                                        <td><code>{{ rule.payee_pattern }}</code></td>
+                                        <td>
+                                            {% if rule.category %}
+                                                <span class="badge bg-primary">{{ rule.category.name }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Uncategorized</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="width: 120px;">
+                                                <div class="progress-bar
+                                                    {% if rule.confidence_score >= 90 %}bg-success
+                                                    {% elif rule.confidence_score >= 70 %}bg-primary
+                                                    {% else %}bg-warning{% endif %}"
+                                                     role="progressbar"
+                                                     style="width: {{ rule.confidence_score }}%"
+                                                     aria-valuenow="{{ rule.confidence_score }}"
+                                                     aria-valuemin="0" aria-valuemax="100">
+                                                    {{ rule.confidence_score|round|int }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ rule.usage_count }}</span>
+                                        </td>
+                                        <td>
+                                            {% if rule.is_auto_learned %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-robot"></i> Auto
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-primary">
+                                                    <i class="fas fa-user"></i> Manual
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {{ rule.created_at.strftime('%Y-%m-%d') }}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('ai_categorizer.delete_rule', rule_id=rule.id) }}"
+                                                  style="display: inline;"
+                                                  onsubmit="return confirm('Delete this rule?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No rules match your filters. Try adjusting the filter criteria or train the model to create new rules.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Average Confidence</h5>
+                <h2>{{ avg_confidence|round|int }}%</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Total Usage</h5>
+                <h2>{{ total_usage }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">High Confidence Rules</h5>
+                <h2>{{ high_confidence_count }}</h2>
+                <small class="text-muted">≥ 90%</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

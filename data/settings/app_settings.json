@@ -1,0 +1,11 @@
+{
+  "currency": "PHP",
+  "account_types": [
+    "checking",
+    "savings",
+    "credit_card",
+    "cash",
+    "digital_wallet",
+    "loan"
+  ]
+}

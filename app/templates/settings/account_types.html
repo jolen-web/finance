@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Account Types - Settings - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Account Types</h1>
+            <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Settings
+            </a>
+        </div>
+        <p class="text-muted">Manage your custom account types</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-list"></i> Current Account Types</h5>
+            </div>
+            <div class="card-body">
+                {% if account_types %}
+                    <div class="list-group">
+                        {% for account_type in account_types %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>
+                                    <i class="fas fa-tag me-2"></i>
+                                    <strong>{{ account_type|replace('_', ' ')|title }}</strong>
+                                </span>
+                                <form method="POST" style="display: inline;" onsubmit="return confirm('Remove this account type?');">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="type_to_delete" value="{{ account_type }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fas fa-trash"></i> Remove
+                                    </button>
+                                </form>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No account types configured.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Add New Account Type</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="new_type" class="form-label">Account Type Name *</label>
+                        <input type="text" class="form-control" id="new_type" name="new_type"
+                               placeholder="e.g., Investment, Loan, Brokerage"
+                               required maxlength="50">
+                        <small class="form-text text-muted">
+                            Enter a descriptive name for the new account type. Spaces and special characters will be converted to underscores.
+                        </small>
+                    </div>
+
+                    <input type="hidden" name="action" value="add">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Account Type
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Tips</h5>
+            </div>
+            <div class="card-body">
+                <ul class="small">
+                    <li>Custom account types are available when creating new accounts</li>
+                    <li>Account types are for organizational purposes only</li>
+                    <li>You can remove account types anytime</li>
+                    <li>Removing a type won't delete existing accounts of that type</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

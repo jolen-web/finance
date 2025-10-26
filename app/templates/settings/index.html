@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h1>Settings</h1>
+        <p class="text-muted">Configure your application preferences</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-exchange-alt"></i> Currency Settings</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('settings.update') }}">
+                    <div class="mb-3">
+                        <label for="currency" class="form-label">Display Currency</label>
+                        <select class="form-select" id="currency" name="currency" required>
+                            {% for code, info in currencies.items() %}
+                                <option value="{{ code }}" {% if code == current_currency %}selected{% endif %}>
+                                    {{ info.symbol }} - {{ info.name }} ({{ code }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">
+                            Select the currency symbol to display throughout the application
+                        </small>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> <strong>Current Currency:</strong>
+                        {{ currencies[current_currency].symbol }} {{ currencies[current_currency].name }}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Dashboard Preferences</h5>
+            </div>
+            <div class="card-body">
+                <p>Customize which sections appear on your dashboard.</p>
+                <a href="{{ url_for('settings.dashboard_preferences') }}" class="btn btn-primary">
+                    <i class="fas fa-cog"></i> Dashboard Preferences
+                </a>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-list-check"></i> Account Type Management</h5>
+            </div>
+            <div class="card-body">
+                <p>Customize your account types to fit your financial setup.</p>
+                <a href="{{ url_for('settings.account_types') }}" class="btn btn-primary">
+                    <i class="fas fa-cog"></i> Manage Account Types
+                </a>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-tags"></i> Categories</h5>
+                <a href="{{ url_for('settings.new_category') }}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus-circle"></i> New Category
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Income Categories</h6>
+                        <div class="list-group list-group-sm">
+                            {% for category in categories %}
+                                {% if category.is_income and not category.parent_id %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>{{ category.name }}</span>
+                                        <div>
+                                            <a href="{{ url_for('settings.edit_category', id=category.id) }}" class="btn btn-sm btn-outline-primary" title="Edit">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </a>
+                                            <form action="{{ url_for('settings.delete_category', id=category.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this category?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <h6>Expense Categories</h6>
+                        <div class="list-group list-group-sm">
+                            {% for category in categories %}
+                                {% if not category.is_income and not category.parent_id %}
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <strong>{{ category.name }}</strong>
+                                            <div>
+                                                <a href="{{ url_for('settings.edit_category', id=category.id) }}" class="btn btn-sm btn-outline-primary" title="Edit">
+                                                    <i class="fas fa-pencil-alt"></i>
+                                                </a>
+                                                <form action="{{ url_for('settings.delete_category', id=category.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this category?');">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        {% if category.subcategories %}
+                                            <div class="ms-3 mt-2">
+                                                {% for subcat in category.subcategories %}
+                                                    <div class="d-flex justify-content-between align-items-center py-1">
+                                                        <small>{{ subcat.name }}</small>
+                                                        <div>
+                                                            <a href="{{ url_for('settings.edit_category', id=subcat.id) }}" class="btn btn-sm btn-link p-0" title="Edit">
+                                                                <i class="fas fa-pencil-alt"></i>
+                                                            </a>
+                                                            <form action="{{ url_for('settings.delete_category', id=subcat.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this category?');">
+                                                                <button type="submit" class="btn btn-sm btn-link p-0 text-danger" title="Delete">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> About Currency Settings</h5>
+            </div>
+            <div class="card-body">
+                <p>The currency setting controls which symbol is displayed throughout the application for all monetary amounts.</p>
+                <ul>
+                    <li>This setting is stored locally and persists across sessions</li>
+                    <li>Changing the currency only updates the display symbol, not the actual values</li>
+                    <li>All amounts remain in their original numeric values</li>
+                    <li>For true multi-currency support with conversion, that would be a future enhancement</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Available Currencies</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for code, info in currencies.items() %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>{{ info.name }}</span>
+                            <span class="badge bg-primary rounded-pill">{{ info.symbol }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

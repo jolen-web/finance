@@ -1,0 +1,775 @@
+{% extends "base.html" %}
+
+{% block title %}Upload New Receipt - Finance Tracker{% endblock %}
+
+{% block extra_styles %}
+<style>
+/* Mobile-responsive table styling */
+@media (max-width: 768px) {
+    #statementReviewModal .modal-dialog {
+        margin: 0.5rem;
+    }
+
+    #transactionsTable {
+        font-size: 0.85rem;
+    }
+
+    #transactionsTable th,
+    #transactionsTable td {
+        padding: 0.5rem 0.25rem;
+    }
+
+    #transactionsTable input[type="date"],
+    #transactionsTable input[type="text"],
+    #transactionsTable input[type="number"],
+    #transactionsTable select {
+        font-size: 0.85rem;
+        padding: 0.25rem;
+    }
+
+    /* Stack buttons vertically on mobile */
+    .modal-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .modal-footer button {
+        width: 100%;
+    }
+}
+
+/* Touch-friendly checkboxes */
+.transaction-checkbox,
+#selectAllCheckbox {
+    width: 1.2rem;
+    height: 1.2rem;
+    cursor: pointer;
+}
+
+/* Highlight selected rows */
+tr:has(.transaction-checkbox:checked) {
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* Better spacing for mobile controls */
+.mb-3 .btn {
+    white-space: nowrap;
+}
+
+@media (max-width: 576px) {
+    .mb-3 .btn {
+        font-size: 0.85rem;
+        padding: 0.375rem 0.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h1>Upload New Receipt</h1>
+        <p class="text-muted">Upload a receipt and we'll create a transaction from it</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="account_id" class="form-label">Account *</label>
+                        <select class="form-select" id="account_id" name="account_id" required>
+                            <option value="">Select account...</option>
+                            {% for account in accounts %}
+                                <option value="{{ account.id }}">{{ account.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="receipt_file" class="form-label">Receipt Image/PDF *</label>
+                        <input type="file" class="form-control" id="receipt_file" name="receipt_file"
+                               accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf" required>
+                        <small class="form-text text-muted">
+                            Accepted formats: PNG, JPG, JPEG, WEBP, PDF (Max 10MB)
+                        </small>
+                    </div>
+
+                    <!-- Preview area -->
+                    <div id="preview-area" class="mb-3" style="display: none;">
+                        <label class="form-label">Preview:</label>
+                        <div class="text-center">
+                            <img id="preview-image" src="" style="max-width: 100%; max-height: 400px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> We'll automatically extract the merchant, date, amount, and items from your receipt and create a new transaction.
+                    </div>
+
+                    <!-- Progress indicator -->
+                    <div id="extractionProgress" class="alert alert-primary" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div id="progressMessage">Processing...</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('receipts.index') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Upload & Create Transaction
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PDF Password Modal -->
+<div class="modal fade" id="pdfPasswordModal" tabindex="-1" aria-labelledby="pdfPasswordLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pdfPasswordLabel">
+                    <i class="fas fa-lock"></i> PDF Password Required
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle"></i> This PDF is password-protected. Please enter the password to continue.
+                </div>
+                <div class="mb-3">
+                    <label for="pdfPassword" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="pdfPassword" placeholder="Enter PDF password">
+                    <div id="passwordError" class="invalid-feedback" style="display: none;">
+                        Invalid password. Please try again.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submitPasswordBtn">
+                    <i class="fas fa-unlock"></i> Unlock & Process
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statement Review Modal -->
+<div class="modal fade" id="statementReviewModal" tabindex="-1" aria-labelledby="statementReviewLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statementReviewLabel">
+                    <i class="fas fa-file-invoice-dollar"></i> Review Extracted Transactions
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Statement Summary -->
+                <div id="statementSummary" class="alert alert-info mb-3" style="display: none;">
+                    <h6><i class="fas fa-chart-line"></i> Statement Summary</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Total Transactions:</strong> <span id="summaryTotalCount">0</span>
+                        </div>
+                        <div class="col-md-4" id="summaryPreviousBalance" style="display: none;">
+                            <strong>Previous Balance:</strong> {{ currency_symbol }}<span id="summaryPreviousBalanceAmount">0.00</span>
+                        </div>
+                        <div class="col-md-4" id="summaryNewBalance" style="display: none;">
+                            <strong>New Balance:</strong> {{ currency_symbol }}<span id="summaryNewBalanceAmount">0.00</span>
+                        </div>
+                        <div class="col-md-4" id="summaryTotal" style="display: none;">
+                            <strong>Statement Total:</strong> {{ currency_symbol }}<span id="summaryTotalAmount">0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Review and edit the transactions extracted from your statement. Uncheck any you don't want to import.
+                </div>
+
+                <div class="mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllBtn">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllBtn">
+                        <i class="far fa-square"></i> Deselect All
+                    </button>
+                    <span class="ms-3 text-muted">
+                        <strong id="selectedCount">0</strong> transactions selected
+                    </span>
+                </div>
+
+                <!-- Mobile-friendly table -->
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm" id="transactionsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 50px;">
+                                    <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                                </th>
+                                <th style="width: 120px;">Date</th>
+                                <th>Description</th>
+                                <th style="width: 120px;">Amount</th>
+                                <th style="width: 180px;">Category</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionRows">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="importSelectedBtn">
+                    <i class="fas fa-file-import"></i> Import Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let extractedTransactions = [];
+let selectedAccountId = null;
+let currentFormData = null;
+let pendingPassword = false;
+let availableCategories = [];
+let currencySymbol = '{{ currency_symbol }}';
+
+// Format amount with currency symbol and thousands separator
+function formatCurrency(amount) {
+    if (amount === null || amount === undefined) return '0.00';
+    const absAmount = Math.abs(amount);
+    const formatted = absAmount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+    return formatted;
+}
+
+// Escape HTML special characters to prevent XSS
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+// Copy error message to clipboard
+function copyErrorText() {
+    const errorBlock = document.getElementById('errorBlock');
+    if (!errorBlock) return;
+
+    const text = errorBlock.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        // Show brief "Copied!" feedback
+        const btn = event.target.closest('button');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy error message');
+    });
+}
+
+// Load categories from API on page load
+async function loadCategories() {
+    try {
+        const response = await fetch('{{ url_for("receipts.get_categories") }}');
+        const data = await response.json();
+        availableCategories = data.categories || [];
+    } catch (error) {
+        console.error('Error loading categories:', error);
+    }
+}
+
+// Suggest categories for all extracted transactions using smart categorization
+async function suggestCategoriesForTransactions() {
+    if (!extractedTransactions || extractedTransactions.length === 0) {
+        return;
+    }
+
+    try {
+        // Get unique merchants from extracted transactions
+        const merchants = [...new Set(extractedTransactions.map(t => t.description))];
+
+        const response = await fetch('{{ url_for("receipts.suggest_categories") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ merchants: merchants })
+        });
+
+        if (!response.ok) {
+            console.error('Failed to get category suggestions');
+            return;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.suggestions) {
+            // Create a map of merchant -> suggested category
+            const suggestionMap = {};
+            data.suggestions.forEach(sug => {
+                suggestionMap[sug.merchant] = {
+                    category_id: sug.category_id,
+                    category_name: sug.category_name,
+                    is_cached: sug.is_cached
+                };
+            });
+
+            // Apply suggestions to extracted transactions
+            extractedTransactions.forEach((trans, index) => {
+                const suggestion = suggestionMap[trans.description];
+                if (suggestion && suggestion.category_id) {
+                    trans.category = suggestion.category_name;
+                    trans.category_id = suggestion.category_id;
+                    console.log(`Applied category for "${trans.description}": ${suggestion.category_name} ${suggestion.is_cached ? '(cached)' : '(LLM)'}`);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error suggesting categories:', error);
+        // Continue without suggestions if there's an error
+    }
+}
+
+// Load categories when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadCategories();
+});
+
+// Image preview
+document.getElementById('receipt_file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            document.getElementById('preview-image').src = event.target.result;
+            document.getElementById('preview-area').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        document.getElementById('preview-area').style.display = 'none';
+    }
+});
+
+// Handle form submission with AJAX to check for statement data
+document.querySelector('form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    await submitForm(new FormData(this));
+});
+
+async function submitForm(formData, password = null) {
+    selectedAccountId = formData.get('account_id');
+
+    if (!selectedAccountId) {
+        alert('Please select an account');
+        return;
+    }
+
+    // Add password if provided
+    if (password) {
+        formData.append('pdf_password', password);
+    }
+
+    // Show loading state and progress indicator
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+    // Show progress indicator
+    const progressDiv = document.getElementById('extractionProgress');
+    const progressMessage = document.getElementById('progressMessage');
+    progressDiv.style.display = 'block';
+    progressDiv.className = 'alert alert-primary';
+    progressMessage.innerHTML = '<i class="fas fa-robot me-2"></i><strong>Step 1:</strong> Analyzing image with AI...';
+
+    try {
+        // Submit form
+        const response = await fetch(document.querySelector('form').action, {
+            method: 'POST',
+            body: formData
+        });
+
+        // Check if response is JSON (statement data or error) or redirect (single receipt)
+        const contentType = response.headers.get('content-type');
+
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+
+            // Check for PDF password requirement
+            if (data.error === 'PDF_PASSWORD_REQUIRED') {
+                currentFormData = formData;
+                showPasswordModal();
+                return;
+            }
+
+            // Check for invalid password
+            if (data.error && data.error.includes('password')) {
+                document.getElementById('passwordError').style.display = 'block';
+                document.getElementById('pdfPassword').classList.add('is-invalid');
+                return;
+            }
+
+            // Update progress based on extraction method
+            if (data.extraction_method) {
+                if (data.extraction_method === 'ocr') {
+                    progressMessage.innerHTML = '<i class="fas fa-eye me-2"></i><strong>Step 2:</strong> Using OCR text extraction...';
+                }
+            }
+
+            // Extract transactions and show review modal
+            if (data.line_items && data.line_items.length > 0) {
+                // Success! Show success message with extraction method
+                const method = data.extraction_method === 'gemini' ? 'AI' : 'OCR';
+                progressDiv.className = 'alert alert-success';
+                progressMessage.innerHTML = `<i class="fas fa-check-circle me-2"></i><strong>Success!</strong> Extracted ${data.transaction_count} transaction(s) using ${method}`;
+
+                setTimeout(async () => {
+                    progressDiv.style.display = 'none';
+                    extractedTransactions = data.line_items;
+
+                    // Get category suggestions for all merchants
+                    await suggestCategoriesForTransactions();
+
+                    showReviewModal(data.statement_info);
+                }, 1000);
+            } else if (data.redirect_url) {
+                // No line items, redirect normally
+                window.location.href = data.redirect_url;
+            } else if (data.error) {
+                // Show error with details in a copy-able code block
+                progressDiv.className = 'alert alert-danger';
+                progressMessage.innerHTML = `
+                    <div class="mb-2">
+                        <i class="fas fa-exclamation-circle me-2"></i><strong>Error importing transactions:</strong>
+                    </div>
+                    <div class="bg-dark text-light p-3 rounded border border-danger" style="font-family: monospace; font-size: 0.85rem; overflow-x: auto; max-height: 300px; overflow-y: auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <small class="text-muted">Error Details (copy this for support)</small>
+                            <button type="button" class="btn btn-sm btn-outline-light" onclick="copyErrorText()" title="Copy error message">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                        </div>
+                        <pre id="errorBlock" style="margin: 0; white-space: pre-wrap; word-break: break-word;">${escapeHtml(data.error)}</pre>
+                    </div>
+                `;
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            } else {
+                progressDiv.className = 'alert alert-warning';
+                progressMessage.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i><strong>Warning:</strong> No transactions extracted from receipt';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        } else {
+            // Single receipt - follow redirect
+            window.location.href = response.url;
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        progressDiv.className = 'alert alert-danger';
+        progressMessage.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i><strong>Error:</strong> ${error.message || 'Error processing receipt. Please try again.'}`;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
+}
+
+// Show PDF password modal
+function showPasswordModal() {
+    const modal = new bootstrap.Modal(document.getElementById('pdfPasswordModal'));
+    modal.show();
+    document.getElementById('pdfPassword').focus();
+}
+
+// Handle password submission
+document.getElementById('submitPasswordBtn').addEventListener('click', async function() {
+    const password = document.getElementById('pdfPassword').value;
+
+    if (!password) {
+        alert('Please enter a password');
+        return;
+    }
+
+    // Hide error
+    document.getElementById('passwordError').style.display = 'none';
+    document.getElementById('pdfPassword').classList.remove('is-invalid');
+
+    // Close modal
+    bootstrap.Modal.getInstance(document.getElementById('pdfPasswordModal')).hide();
+
+    // Retry with password
+    await submitForm(currentFormData, password);
+
+    // Clear password field
+    document.getElementById('pdfPassword').value = '';
+});
+
+function showReviewModal(statementInfo = null) {
+    const tbody = document.getElementById('transactionRows');
+    tbody.innerHTML = '';
+
+    // Display statement summary if available
+    if (statementInfo && extractedTransactions.length > 0 && extractedTransactions[0]._statement_info) {
+        const info = extractedTransactions[0]._statement_info;
+        document.getElementById('statementSummary').style.display = 'block';
+        document.getElementById('summaryTotalCount').textContent = extractedTransactions.length;
+
+        if (info.previous_balance != null) {
+            document.getElementById('summaryPreviousBalance').style.display = 'block';
+            document.getElementById('summaryPreviousBalanceAmount').textContent = formatCurrency(info.previous_balance);
+        }
+
+        if (info.new_balance != null) {
+            document.getElementById('summaryNewBalance').style.display = 'block';
+            document.getElementById('summaryNewBalanceAmount').textContent = formatCurrency(info.new_balance);
+        }
+
+        if (info.total != null) {
+            document.getElementById('summaryTotal').style.display = 'block';
+            document.getElementById('summaryTotalAmount').textContent = formatCurrency(info.total);
+        }
+    } else {
+        document.getElementById('statementSummary').style.display = 'none';
+    }
+
+    extractedTransactions.forEach((trans, index) => {
+        const row = document.createElement('tr');
+
+        // Build category options
+        let categoryOptions = '<option value="">Uncategorized</option>';
+        let selectedCategoryId = '';
+
+        // If we have categories from the API, use them
+        if (availableCategories.length > 0) {
+            availableCategories.forEach(cat => {
+                categoryOptions += `<option value="${cat.id}">${cat.name}</option>`;
+            });
+
+            // If LLM suggested a category, try to match it with smart fuzzy matching
+            if (trans.category) {
+                const suggestedLower = trans.category.toLowerCase().trim();
+
+                // First try exact match
+                let matchedCat = availableCategories.find(cat =>
+                    cat.name.toLowerCase() === suggestedLower
+                );
+
+                // If no exact match, try substring matching (category name contains suggestion or vice versa)
+                if (!matchedCat) {
+                    matchedCat = availableCategories.find(cat => {
+                        const catNameLower = cat.name.toLowerCase();
+                        return catNameLower.includes(suggestedLower) || suggestedLower.includes(catNameLower);
+                    });
+                }
+
+                // If still no match, try word-based matching
+                if (!matchedCat) {
+                    const suggestionWords = suggestedLower.split(/[\s-]/);
+                    matchedCat = availableCategories.find(cat => {
+                        const catWords = cat.name.toLowerCase().split(/[\s-]/);
+                        return suggestionWords.some(word => catWords.some(catWord =>
+                            catWord === word || catWord.includes(word) || word.includes(catWord)
+                        ));
+                    });
+                }
+
+                if (matchedCat) {
+                    selectedCategoryId = matchedCat.id;
+                    console.log(`Matched category: "${trans.category}" -> "${matchedCat.name}"`);
+                }
+            }
+        }
+
+        row.innerHTML = `
+            <td>
+                <input type="checkbox" class="form-check-input transaction-checkbox"
+                       data-index="${index}" checked>
+            </td>
+            <td>
+                <input type="date" class="form-control form-control-sm"
+                       value="${trans.date}" data-field="date" data-index="${index}">
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                       value="${trans.description}" data-field="description" data-index="${index}">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm"
+                       step="0.01" value="${trans.amount}" data-field="amount" data-index="${index}">
+            </td>
+            <td>
+                <select class="form-select form-select-sm" data-field="category_id" data-index="${index}">
+                    ${categoryOptions}
+                </select>
+            </td>
+        `;
+
+        // Set the selected value after adding the row
+        if (selectedCategoryId) {
+            setTimeout(() => {
+                row.querySelector(`select[data-index="${index}"]`).value = selectedCategoryId;
+                extractedTransactions[index]['category_id'] = selectedCategoryId;
+            }, 0);
+        }
+
+        tbody.appendChild(row);
+    });
+
+    updateSelectedCount();
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('statementReviewModal'));
+    modal.show();
+}
+
+// Select/Deselect all
+document.getElementById('selectAllCheckbox').addEventListener('change', function() {
+    document.querySelectorAll('.transaction-checkbox').forEach(cb => {
+        cb.checked = this.checked;
+    });
+    updateSelectedCount();
+});
+
+document.getElementById('selectAllBtn').addEventListener('click', function() {
+    document.querySelectorAll('.transaction-checkbox').forEach(cb => cb.checked = true);
+    document.getElementById('selectAllCheckbox').checked = true;
+    updateSelectedCount();
+});
+
+document.getElementById('deselectAllBtn').addEventListener('click', function() {
+    document.querySelectorAll('.transaction-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllCheckbox').checked = false;
+    updateSelectedCount();
+});
+
+// Update count when checkboxes change
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('transaction-checkbox')) {
+        updateSelectedCount();
+    }
+});
+
+// Update editable fields
+document.addEventListener('input', function(e) {
+    const field = e.target.dataset.field;
+    const index = e.target.dataset.index;
+
+    if (field && index !== undefined) {
+        extractedTransactions[index][field] = e.target.value;
+    }
+});
+
+// Update category selection
+document.addEventListener('change', function(e) {
+    if (e.target.dataset.field === 'category_id') {
+        const index = e.target.dataset.index;
+        const value = e.target.value;
+        if (index !== undefined) {
+            extractedTransactions[index]['category_id'] = value ? parseInt(value) : null;
+        }
+    }
+});
+
+function updateSelectedCount() {
+    const count = document.querySelectorAll('.transaction-checkbox:checked').length;
+    document.getElementById('selectedCount').textContent = count;
+
+    // Update statement summary with selected transactions only
+    updateStatementSummary();
+}
+
+function updateStatementSummary() {
+    // Get only checked transactions
+    const selectedTransactions = extractedTransactions.filter((trans, index) => {
+        const checkbox = document.querySelector(`.transaction-checkbox[data-index="${index}"]`);
+        return checkbox && checkbox.checked;
+    });
+
+    // Update total count
+    document.getElementById('summaryTotalCount').textContent = selectedTransactions.length;
+
+    // Calculate total amount
+    let totalAmount = 0;
+    selectedTransactions.forEach(trans => {
+        const amount = parseFloat(trans.amount) || 0;
+        totalAmount += amount;
+    });
+
+    // Update total amount in summary
+    document.getElementById('summaryTotalAmount').textContent = formatCurrency(totalAmount);
+}
+
+// Import selected transactions
+document.getElementById('importSelectedBtn').addEventListener('click', async function() {
+    const selectedTransactions = extractedTransactions.filter((trans, index) => {
+        const checkbox = document.querySelector(`.transaction-checkbox[data-index="${index}"]`);
+        return checkbox && checkbox.checked;
+    });
+
+    if (selectedTransactions.length === 0) {
+        alert('Please select at least one transaction to import');
+        return;
+    }
+
+    // Show loading
+    this.disabled = true;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+
+    try {
+        // Send all transactions to bulk import endpoint
+        const response = await fetch('{{ url_for("receipts.bulk_import") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                account_id: selectedAccountId,
+                transactions: selectedTransactions
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            // Redirect to transactions list
+            window.location.href = '{{ url_for("transactions.list_transactions") }}';
+        } else {
+            const errorMsg = data.error || 'Unknown error occurred';
+            alert(`Error importing transactions: ${errorMsg}`);
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-file-import"></i> Import Selected';
+        }
+    } catch (error) {
+        console.error('Import error:', error);
+        alert('Error importing transactions: ' + error.message);
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-file-import"></i> Import Selected';
+    }
+});
+</script>
+{% endblock %}

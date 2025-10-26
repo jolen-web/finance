@@ -1,0 +1,77 @@
+/* Custom styles for Finance Tracker */
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.card {
+    box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.24);
+    border: none;
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 2px solid #f8f9fa;
+    font-weight: 600;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.btn-link {
+    text-decoration: none;
+}
+
+.btn-link:hover {
+    text-decoration: underline;
+}
+
+/* Status icons */
+.bi-check-circle-fill {
+    font-size: 1.2rem;
+}
+
+.bi-shield-check-fill {
+    font-size: 1.2rem;
+}
+
+/* Dashboard cards */
+.card.text-white h2 {
+    font-weight: 300;
+    margin: 10px 0;
+}
+
+.card.text-white .card-body {
+    padding: 1.5rem;
+}
+
+/* Pagination */
+.pagination {
+    margin-top: 20px;
+}
+
+/* Form inputs */
+.form-control:focus,
+.form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table {
+        font-size: 0.875rem;
+    }
+
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}

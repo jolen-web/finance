@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Assets - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Assets</h1>
+            <a href="{{ url_for('assets.new_asset') }}" class="btn btn-primary">
+                <i class="fas fa-plus-circle"></i> Add Asset
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if assets.items %}
+<!-- Asset Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted mb-2">Total Value</h6>
+                <h2 class="text-primary">{{ total_value|currency }}</h2>
+                <small class="text-muted">Current valuation</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted mb-2">Total Invested</h6>
+                <h2>{{ total_invested|currency }}</h2>
+                <small class="text-muted">Original cost</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted mb-2">Gain/Loss</h6>
+                <h2 class="{% if total_gain_loss >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ total_gain_loss|currency }}
+                </h2>
+                <small class="text-muted">Value change</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assets Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Your Assets</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Purchase Price</th>
+                                <th>Current Value</th>
+                                <th>Gain/Loss</th>
+                                <th>Purchase Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for asset in assets.items %}
+                                <tr>
+                                    <td><strong>{{ asset.name }}</strong></td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {{ asset.asset_type|replace('_', ' ')|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if asset.purchase_price %}
+                                            {{ asset.purchase_price|currency }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ asset.current_value|currency }}</td>
+                                    <td>
+                                        {% set gain_loss = asset.get_gain_loss() %}
+                                        <span class="{% if gain_loss >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                            {{ gain_loss|currency }}
+                                            {% if asset.purchase_price %}
+                                                <br><small>({{ "%.1f"|format(asset.get_gain_loss_percentage()) }}%)</small>
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if asset.purchase_date %}
+                                            {{ asset.purchase_date.strftime('%Y-%m-%d') }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('assets.edit_asset', id=asset.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-pencil-alt"></i> Edit
+                                        </a>
+                                        <form action="{{ url_for('assets.delete_asset', id=asset.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this asset?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if assets.pages > 1 %}
+                    <nav>
+                        <ul class="pagination justify-content-center">
+                            {% if assets.has_prev %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('assets.list_assets', page=assets.prev_num) }}">Previous</a>
+                                </li>
+                            {% endif %}
+
+                            {% for page_num in assets.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                                {% if page_num %}
+                                    <li class="page-item {% if page_num == assets.page %}active{% endif %}">
+                                        <a class="page-link" href="{{ url_for('assets.list_assets', page=page_num) }}">{{ page_num }}</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if assets.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('assets.list_assets', page=assets.next_num) }}">Next</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-box" style="font-size: 3rem; color: #ccc;"></i>
+                    <p class="text-muted mt-3">No assets yet. Start tracking your valuable possessions!</p>
+                    <a href="{{ url_for('assets.new_asset') }}" class="btn btn-primary">
+                        <i class="fas fa-plus-circle"></i> Add Your First Asset
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

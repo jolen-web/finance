@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Year-End Summary {{ selected_year }} - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-calendar-check"></i> Year-End Summary {{ selected_year }}</h1>
+                <p class="text-muted">Comprehensive financial summary for tax preparation</p>
+            </div>
+            <div>
+                <button onclick="window.print()" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <a href="{{ url_for('tax_assistant.index', year=selected_year) }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Year Selector -->
+<div class="row mb-3 d-print-none">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="year" class="form-label">Tax Year</label>
+                        <select class="form-select" id="year" name="year" onchange="this.form.submit()">
+                            {% for year in available_years %}
+                                <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>
+                                    {{ year }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Income & Expenses Summary -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h5 class="card-title text-success">Total Income</h5>
+                <h2>{{ summary.total_income|currency }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h5 class="card-title text-danger">Total Expenses</h5>
+                <h2>{{ summary.total_expenses|currency }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <h5 class="card-title text-primary">Net Income</h5>
+                <h2 class="{% if summary.net_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ summary.net_income|currency }}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tax Deductions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-file-invoice-dollar"></i> Tax Deductions Summary</h5>
+            </div>
+            <div class="card-body">
+                <h3 class="text-center mb-4">Total Tax Deductions: {{ summary.tax_deductions|currency }}</h3>
+
+                {% if summary.deductions_by_type %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Deduction Category</th>
+                                    <th>Count</th>
+                                    <th>Total Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for deduction_type, data in summary.deductions_by_type.items() %}
+                                    <tr>
+                                        <td>{{ deduction_type.replace('_', ' ').title() }}</td>
+                                        <td>{{ data.count }}</td>
+                                        <td><strong>{{ data.total|currency }}</strong></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No tax deductions tagged for this year.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Expense Breakdown by Category -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Expenses by Category</h5>
+            </div>
+            <div class="card-body">
+                {% if summary.category_breakdown %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>% of Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for category, amount in summary.category_breakdown.items() %}
+                                    <tr>
+                                        <td>{{ category }}</td>
+                                        <td>{{ amount|currency }}</td>
+                                        <td>{{ (amount / summary.total_expenses * 100)|round(1) }}%</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No categorized expenses for this year.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Accounts Summary -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-university"></i> Current Account Balances</h5>
+            </div>
+            <div class="card-body">
+                <h4 class="text-center mb-3">Total Balance: {{ summary.accounts_summary.total_balance|currency }}</h4>
+
+                {% if summary.accounts_summary.by_account %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Account</th>
+                                    <th>Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for account_name, balance in summary.accounts_summary.by_account.items() %}
+                                    <tr>
+                                        <td>{{ account_name }}</td>
+                                        <td>{{ balance|currency }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Print Footer -->
+<div class="row d-none d-print-block">
+    <div class="col-12">
+        <hr>
+        <p class="text-muted text-center">
+            Generated on {{ summary.tax_year }} | Finance Tracker Year-End Summary<br>
+            <small>This is for informational purposes only. Consult with a tax professional for advice.</small>
+        </p>
+    </div>
+</div>
+{% endblock %}

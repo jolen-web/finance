@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}View Receipt - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Receipt Details</h1>
+            <div>
+                <form action="{{ url_for('receipts.delete', receipt_id=receipt.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this receipt?');">
+                    <button type="submit" class="btn btn-outline-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </form>
+                <a href="{{ url_for('receipts.index') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Receipt image -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Receipt Image</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('receipts.serve_image', receipt_id=receipt.id) }}"
+                     style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
+                     alt="Receipt">
+            </div>
+        </div>
+    </div>
+
+    <!-- Extracted data -->
+    <div class="col-md-6">
+        <!-- Transaction info -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0">Linked Transaction</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Payee:</strong> {{ receipt.transaction.payee }}</p>
+                <p><strong>Date:</strong> {{ receipt.transaction.date.strftime('%Y-%m-%d') }}</p>
+                <p><strong>Amount:</strong> {{ receipt.transaction.amount|currency }}</p>
+                <p><strong>Account:</strong> {{ receipt.transaction.account.name }}</p>
+                <a href="{{ url_for('transactions.edit_transaction', id=receipt.transaction.id) }}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-pencil-alt"></i> Edit Transaction
+                </a>
+            </div>
+        </div>
+
+        <!-- Extracted data -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0">Extracted Data (OCR)</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <th>Merchant:</th>
+                            <td>{{ receipt.extracted_merchant or 'Not detected' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Date:</th>
+                            <td>{{ receipt.extracted_date.strftime('%Y-%m-%d') if receipt.extracted_date else 'Not detected' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Amount:</th>
+                            <td>{{ receipt.extracted_amount|currency if receipt.extracted_amount else 'Not detected' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {% if receipt.extracted_amount and (receipt.extracted_amount != receipt.transaction.amount) %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Mismatch:</strong> Extracted amount ({{ receipt.extracted_amount|currency }}) differs from transaction amount ({{ receipt.transaction.amount|currency }})
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Line items -->
+        {% if items %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Extracted Items</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                                <tr>
+                                    <td>{{ item.name }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.price|currency }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Metadata -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">Metadata</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Filename:</strong> {{ receipt.filename }}</p>
+                <p><strong>File Type:</strong> {{ receipt.file_type }}</p>
+                <p><strong>Uploaded:</strong> {{ receipt.uploaded_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

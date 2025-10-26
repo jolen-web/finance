@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Tagged Transactions - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-tags"></i> Tagged Tax Deductions</h1>
+                <p class="text-muted">All tagged deductible transactions for {{ selected_year }}</p>
+            </div>
+            <a href="{{ url_for('tax_assistant.index', year=selected_year) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="year" class="form-label">Tax Year</label>
+                        <select class="form-select" id="year" name="year" onchange="this.form.submit()">
+                            {% for year in available_years %}
+                                <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>
+                                    {{ year }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="type" class="form-label">Deduction Type</label>
+                        <select class="form-select" id="type" name="type" onchange="this.form.submit()">
+                            <option value="">All Types</option>
+                            {% for dtype, info in deduction_categories.items() %}
+                                <option value="{{ dtype }}" {% if dtype == selected_type %}selected{% endif %}>
+                                    {{ info.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <a href="{{ url_for('tax_assistant.export_csv', tax_year=selected_year) }}" class="btn btn-success">
+                            <i class="fas fa-download"></i> Export CSV
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Total -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">Total Deductible Amount</h5>
+                <h2>{{ total_deductible|currency }}</h2>
+                <p class="mb-0">from {{ tags|length }} transactions</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tagged Transactions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Tagged Transactions</h5>
+            </div>
+            <div class="card-body">
+                {% if tags %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Payee</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>Deduction Type</th>
+                                    <th>%</th>
+                                    <th>Deductible</th>
+                                    <th>Notes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tag in tags %}
+                                    {% set transaction = tag.transaction %}
+                                    {% if transaction %}
+                                        <tr>
+                                            <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
+                                            <td>{{ transaction.payee }}</td>
+                                            <td>
+                                                {% if transaction.category %}
+                                                    <span class="badge bg-secondary">{{ transaction.category.name }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ transaction.amount|currency }}</td>
+                                            <td>
+                                                <span class="badge bg-primary">
+                                                    {{ deduction_categories.get(tag.deduction_type, {}).get('name', tag.deduction_type) }}
+                                                </span>
+                                            </td>
+                                            <td>{{ tag.deduction_percentage }}%</td>
+                                            <td><strong>{{ (transaction.amount|abs * (tag.deduction_percentage / 100))|currency }}</strong></td>
+                                            <td><small>{{ tag.notes or '-' }}</small></td>
+                                            <td>
+                                                <form method="POST" action="{{ url_for('tax_assistant.untag_transaction', tag_id=tag.id) }}"
+                                                      style="display: inline;"
+                                                      onsubmit="return confirm('Remove this tax tag?');">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No tagged transactions found with the selected filters.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

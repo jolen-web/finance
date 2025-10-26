@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Transactions - Finance Tracker{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .bulk-action-bar {
+        background-color: #e7f3ff;
+        padding: 12px;
+        margin-bottom: 15px;
+        border-radius: 4px;
+        border-left: 4px solid #0066cc;
+        display: none;
+    }
+
+    .bulk-action-bar.show {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Transactions</h1>
+            <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-primary">
+                <i class="fas fa-plus-circle"></i> New Transaction
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="account_id" class="form-label">Account</label>
+                        <select class="form-select" id="account_id" name="account_id">
+                            <option value="">All Accounts</option>
+                            {% for account in accounts %}
+                                <option value="{{ account.id }}" {% if request.args.get('account_id')|int == account.id %}selected{% endif %}>
+                                    {{ account.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="category_id" class="form-label">Category</label>
+                        <select class="form-select" id="category_id" name="category_id">
+                            <option value="">All Categories</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}" {% if request.args.get('category_id')|int == category.id %}selected{% endif %}>
+                                    {{ category.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date"
+                               value="{{ request.args.get('start_date', '') }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date"
+                               value="{{ request.args.get('end_date', '') }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="search" class="form-label">Search Payee</label>
+                        <input type="text" class="form-control" id="search" name="search"
+                               placeholder="Search..." value="{{ request.args.get('search', '') }}">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Filter
+                        </button>
+                        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-secondary">
+                            <i class="fas fa-times-circle"></i> Clear
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if transactions.items %}
+                    <!-- Bulk Action Bar -->
+                    <div class="bulk-action-bar" id="bulkActionBar">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><strong id="selectedCount">0</strong> transaction(s) selected</span>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-danger" id="deleteSelectedBtn">
+                                    <i class="fas fa-trash"></i> Delete Selected
+                                </button>
+                                <button type="button" class="btn btn-sm btn-secondary" id="cancelSelectBtn">
+                                    <i class="fas fa-times"></i> Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">
+                                        <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                                    </th>
+                                    <th>Date</th>
+                                    <th>Account</th>
+                                    <th>Payee</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in transactions.items %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input transaction-checkbox" value="{{ transaction.id }}" data-transaction-id="{{ transaction.id }}">
+                                        </td>
+                                        <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
+                                        <td>{{ transaction.account.name }}</td>
+                                        <td>
+                                            <strong>{{ transaction.payee }}</strong>
+                                            {% if transaction.memo %}
+                                                <br><small class="text-muted">{{ transaction.memo }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ transaction.category.name if transaction.category else '-' }}</td>
+                                        <td class="{% if transaction.transaction_type == 'deposit' %}text-success{% else %}text-danger{% endif %}">
+                                            {{ transaction.amount|currency(true) if transaction.transaction_type == 'deposit' else (-transaction.amount)|currency }}
+                                        </td>
+                                        <td>
+                                            <form action="{{ url_for('transactions.toggle_cleared', id=transaction.id) }}" method="POST" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Cleared">
+                                                    {% if transaction.is_cleared %}
+                                                        <i class="fas fa-check-circle text-success"></i>
+                                                    {% else %}
+                                                        <i class="far fa-circle text-muted"></i>
+                                                    {% endif %}
+                                                </button>
+                                            </form>
+                                            <form action="{{ url_for('transactions.toggle_reconciled', id=transaction.id) }}" method="POST" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Reconciled">
+                                                    {% if transaction.is_reconciled %}
+                                                        <i class="fas fa-shield-alt text-primary"></i>
+                                                    {% else %}
+                                                        <i class="far fa-shield text-muted"></i>
+                                                    {% endif %}
+                                                </button>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('transactions.edit_transaction', id=transaction.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </a>
+                                            <form action="{{ url_for('transactions.delete_transaction', id=transaction.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this transaction?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if transactions.pages > 1 %}
+                        <nav>
+                            <ul class="pagination justify-content-center">
+                                {% if transactions.has_prev %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.prev_num) }}">Previous</a>
+                                    </li>
+                                {% endif %}
+
+                                {% for page_num in transactions.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                                    {% if page_num %}
+                                        <li class="page-item {% if page_num == transactions.page %}active{% endif %}">
+                                            <a class="page-link" href="{{ url_for('transactions.list_transactions', page=page_num) }}">{{ page_num }}</a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if transactions.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.next_num) }}">Next</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-list" style="font-size: 3rem; color: #ccc;"></i>
+                        <p class="text-muted mt-3">No transactions found.</p>
+                        <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-primary">
+                            <i class="fas fa-plus-circle"></i> Add First Transaction
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
+    const bulkActionBar = document.getElementById('bulkActionBar');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    const cancelSelectBtn = document.getElementById('cancelSelectBtn');
+
+    // Update selected count and show/hide bulk action bar
+    function updateBulkActionBar() {
+        const checkedCount = document.querySelectorAll('.transaction-checkbox:checked').length;
+        selectedCountSpan.textContent = checkedCount;
+
+        if (checkedCount > 0) {
+            bulkActionBar.classList.add('show');
+        } else {
+            bulkActionBar.classList.remove('show');
+            selectAllCheckbox.checked = false;
+        }
+    }
+
+    // Handle individual checkbox changes
+    transactionCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            updateBulkActionBar();
+
+            // Update select all checkbox state
+            const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
+            const someChecked = Array.from(transactionCheckboxes).some(cb => cb.checked);
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = someChecked && !allChecked;
+        });
+    });
+
+    // Handle select all checkbox
+    selectAllCheckbox.addEventListener('change', function() {
+        transactionCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+        updateBulkActionBar();
+    });
+
+    // Handle cancel button
+    cancelSelectBtn.addEventListener('click', function() {
+        transactionCheckboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        updateBulkActionBar();
+    });
+
+    // Handle delete selected button
+    deleteSelectedBtn.addEventListener('click', function() {
+        const selectedIds = Array.from(
+            document.querySelectorAll('.transaction-checkbox:checked')
+        ).map(cb => parseInt(cb.value));
+
+        if (selectedIds.length === 0) {
+            alert('Please select at least one transaction to delete.');
+            return;
+        }
+
+        // Show confirmation modal
+        const confirmMessage = `Are you sure you want to delete ${selectedIds.length} transaction(s)? This action cannot be undone.`;
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // Send delete request
+        fetch('{{ url_for("transactions.bulk_delete") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                transaction_ids: selectedIds
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload(); // Reload page to show updated transaction list
+            } else {
+                alert('Error deleting transactions: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting transactions: ' + error.message);
+        });
+    });
+});
+</script>
+{% endblock %}

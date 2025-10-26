@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Financial Health Advisor - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h1><i class="fas fa-heartbeat"></i> Financial Health Advisor</h1>
+        <p class="text-muted">Personalized insights and recommendations for your finances</p>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Total Balance</h5>
+                <h2>{{ total_balance|currency }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h5 class="card-title text-danger">Critical</h5>
+                <h2>{{ critical_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <h5 class="card-title text-warning">Warnings</h5>
+                <h2>{{ warning_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <h5 class="card-title text-info">Info</h5>
+                <h2>{{ info_count }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('financial_advisor.analyze') }}" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date"
+                               value="{{ start_date.strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date"
+                               value="{{ end_date.strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-sync-alt"></i> Run Analysis
+                        </button>
+                        <a href="{{ url_for('financial_advisor.spending_analysis') }}" class="btn btn-outline-secondary me-2">
+                            <i class="fas fa-chart-line"></i> Detailed Analysis
+                        </a>
+                        <a href="{{ url_for('financial_advisor.insights_history') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-history"></i> History
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Critical Insights -->
+{% if insights_by_type.critical %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-exclamation-circle"></i> Critical Insights</h5>
+            </div>
+            <div class="card-body">
+                {% for insight in insights_by_type.critical %}
+                    <div class="alert alert-danger d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="alert-heading">{{ insight.title }}</h6>
+                            <p class="mb-1">{{ insight.description }}</p>
+                            {% if insight.amount_impact %}
+                                <p class="mb-0"><strong>Impact:</strong> {{ insight.amount_impact|currency }}</p>
+                            {% endif %}
+                            <small class="text-muted">{{ insight.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                        <form method="POST" action="{{ url_for('financial_advisor.dismiss_insight', insight_id=insight.id) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </form>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Warning Insights -->
+{% if insights_by_type.warning %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Warnings</h5>
+            </div>
+            <div class="card-body">
+                {% for insight in insights_by_type.warning %}
+                    <div class="alert alert-warning d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="alert-heading">{{ insight.title }}</h6>
+                            <p class="mb-1">{{ insight.description }}</p>
+                            {% if insight.amount_impact %}
+                                <p class="mb-0"><strong>Impact:</strong> {{ insight.amount_impact|currency }}</p>
+                            {% endif %}
+                            <small class="text-muted">{{ insight.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                        <form method="POST" action="{{ url_for('financial_advisor.dismiss_insight', insight_id=insight.id) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </form>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Info Insights -->
+{% if insights_by_type.info %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Information & Tips</h5>
+            </div>
+            <div class="card-body">
+                {% for insight in insights_by_type.info %}
+                    <div class="alert alert-info d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="alert-heading">{{ insight.title }}</h6>
+                            <p class="mb-1">{{ insight.description }}</p>
+                            {% if insight.amount_impact %}
+                                <p class="mb-0"><strong>Impact:</strong> {{ insight.amount_impact|currency }}</p>
+                            {% endif %}
+                            <small class="text-muted">{{ insight.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                        <form method="POST" action="{{ url_for('financial_advisor.dismiss_insight', insight_id=insight.id) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </form>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- No Insights -->
+{% if total_insights == 0 %}
+<div class="row">
+    <div class="col-12">
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> No issues detected! Your finances look healthy.
+            <p class="mb-0 mt-2">Run an analysis to generate fresh insights based on your recent transactions.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- How It Works -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-question-circle"></i> What We Analyze</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul>
+                            <li><strong>Spending Spikes:</strong> Detects unusual increases in category spending</li>
+                            <li><strong>Subscription Creep:</strong> Identifies recurring charges that may be forgotten</li>
+                            <li><strong>Savings Rate:</strong> Calculates monthly savings percentage</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul>
+                            <li><strong>Emergency Fund:</strong> Checks if you have 3-6 months of expenses saved</li>
+                            <li><strong>Duplicate Transactions:</strong> Finds potential duplicate entries</li>
+                            <li><strong>Budget Variance:</strong> Compares actual vs budgeted spending</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

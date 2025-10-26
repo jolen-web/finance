@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Receipt - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h1>Upload Receipt</h1>
+        <p class="text-muted">Upload receipt for: {{ transaction.payee }} ({{ transaction.amount|currency }})</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="receipt_file" class="form-label">Receipt Image/PDF</label>
+                        <input type="file" class="form-control" id="receipt_file" name="receipt_file"
+                               accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf" required>
+                        <small class="form-text text-muted">
+                            Accepted formats: PNG, JPG, JPEG, WEBP, PDF (Max 10MB)
+                        </small>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="auto_update" name="auto_update" checked>
+                        <label class="form-check-label" for="auto_update">
+                            Auto-update transaction with extracted data (date, amount, merchant)
+                        </label>
+                    </div>
+
+                    <!-- Preview area -->
+                    <div id="preview-area" class="mb-3" style="display: none;">
+                        <label class="form-label">Preview:</label>
+                        <div class="text-center">
+                            <img id="preview-image" src="" style="max-width: 100%; max-height: 400px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-secondary">Cancel</a>
+                        <div>
+                            <a href="{{ url_for('receipts.camera_capture', transaction_id=transaction.id) }}" class="btn btn-info">
+                                <i class="fas fa-camera"></i> Use Camera
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload"></i> Upload & Process
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Info card -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> How it works</h5>
+            </div>
+            <div class="card-body">
+                <p>Our OCR system will automatically extract:</p>
+                <ul>
+                    <li><strong>Merchant name</strong> from the receipt header</li>
+                    <li><strong>Date</strong> of purchase</li>
+                    <li><strong>Total amount</strong> paid</li>
+                    <li><strong>Line items</strong> (if clearly formatted)</li>
+                </ul>
+                <p class="mb-0"><small class="text-muted">Tip: For best results, take a clear, well-lit photo with the entire receipt visible.</small></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Image preview
+document.getElementById('receipt_file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            document.getElementById('preview-image').src = event.target.result;
+            document.getElementById('preview-area').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        document.getElementById('preview-area').style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

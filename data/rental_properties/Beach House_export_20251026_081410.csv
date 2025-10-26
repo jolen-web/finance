@@ -1,0 +1,28 @@
+RENTAL PROPERTY TRACKER EXPORT
+Property Name,Beach House
+Export Date,2025-10-26T08:14:10.133129
+
+COST BASIS
+Category,Amount
+Land,250000.0
+Building,400000.0
+CIP,0
+Total,650000.0
+
+OPERATING INCOME
+Description,Amount
+Gross Rental Income,5000.0
+Total Expenses,4800.0
+Net Operating Income,200.0
+
+EXPENSES BY CATEGORY
+Category,Amount
+insurance,1200.0
+property_tax,3600.0
+
+DEPRECIATION
+Description,Amount
+Annual Depreciation,14545.454545454546
+Accumulated Depreciation,66666.66666666667
+Remaining Basis,333333.3333333333
+

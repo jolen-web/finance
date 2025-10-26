@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Camera Capture - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h1>Capture Receipt Photo</h1>
+        <p class="text-muted">Take a photo of your receipt for transaction: {{ transaction.payee }}</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-body">
+                <!-- Camera preview -->
+                <div class="text-center mb-3">
+                    <video id="camera-preview" autoplay playsinline style="max-width: 100%; border: 2px solid #ddd; border-radius: 8px;"></video>
+                    <canvas id="camera-canvas" style="display: none;"></canvas>
+                </div>
+
+                <!-- Captured image preview -->
+                <div id="captured-preview" class="text-center mb-3" style="display: none;">
+                    <img id="captured-image" src="" style="max-width: 100%; border: 2px solid #28a745; border-radius: 8px;">
+                </div>
+
+                <!-- Controls -->
+                <div class="text-center">
+                    <button id="start-camera-btn" class="btn btn-primary btn-lg">
+                        <i class="fas fa-camera"></i> Start Camera
+                    </button>
+                    <button id="capture-btn" class="btn btn-success btn-lg" style="display: none;">
+                        <i class="fas fa-camera"></i> Capture Photo
+                    </button>
+                    <button id="retake-btn" class="btn btn-warning btn-lg" style="display: none;">
+                        <i class="fas fa-redo"></i> Retake
+                    </button>
+                    <button id="upload-btn" class="btn btn-primary btn-lg" style="display: none;">
+                        <i class="fas fa-upload"></i> Upload & Process
+                    </button>
+                </div>
+
+                <!-- Progress indicator -->
+                <div id="upload-progress" class="mt-3" style="display: none;">
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%">
+                            Processing receipt...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error message -->
+                <div id="error-message" class="alert alert-danger mt-3" style="display: none;"></div>
+
+                <!-- Back button -->
+                <div class="mt-3 text-center">
+                    <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Cancel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let videoStream = null;
+let capturedBlob = null;
+
+const videoElement = document.getElementById('camera-preview');
+const canvasElement = document.getElementById('camera-canvas');
+const capturedPreview = document.getElementById('captured-preview');
+const capturedImage = document.getElementById('captured-image');
+
+const startCameraBtn = document.getElementById('start-camera-btn');
+const captureBtn = document.getElementById('capture-btn');
+const retakeBtn = document.getElementById('retake-btn');
+const uploadBtn = document.getElementById('upload-btn');
+const uploadProgress = document.getElementById('upload-progress');
+const errorMessage = document.getElementById('error-message');
+
+// Start camera
+startCameraBtn.addEventListener('click', async () => {
+    try {
+        const constraints = {
+            video: {
+                facingMode: 'environment', // Use back camera on mobile
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            }
+        };
+
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoElement.srcObject = videoStream;
+        videoElement.style.display = 'block';
+
+        startCameraBtn.style.display = 'none';
+        captureBtn.style.display = 'inline-block';
+        errorMessage.style.display = 'none';
+    } catch (error) {
+        console.error('Error accessing camera:', error);
+        errorMessage.textContent = 'Error accessing camera. Please grant camera permissions and try again.';
+        errorMessage.style.display = 'block';
+    }
+});
+
+// Capture photo
+captureBtn.addEventListener('click', () => {
+    const context = canvasElement.getContext('2d');
+
+    // Set canvas size to match video
+    canvasElement.width = videoElement.videoWidth;
+    canvasElement.height = videoElement.videoHeight;
+
+    // Draw current video frame to canvas
+    context.drawImage(videoElement, 0, 0);
+
+    // Convert canvas to blob
+    canvasElement.toBlob((blob) => {
+        capturedBlob = blob;
+
+        // Display captured image
+        const url = URL.createObjectURL(blob);
+        capturedImage.src = url;
+        capturedPreview.style.display = 'block';
+
+        // Hide video, show retake and upload buttons
+        videoElement.style.display = 'none';
+        captureBtn.style.display = 'none';
+        retakeBtn.style.display = 'inline-block';
+        uploadBtn.style.display = 'inline-block';
+
+        // Stop camera stream
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+        }
+    }, 'image/jpeg', 0.9);
+});
+
+// Retake photo
+retakeBtn.addEventListener('click', () => {
+    capturedPreview.style.display = 'none';
+    retakeBtn.style.display = 'none';
+    uploadBtn.style.display = 'none';
+    startCameraBtn.style.display = 'inline-block';
+    capturedBlob = null;
+});
+
+// Upload photo
+uploadBtn.addEventListener('click', async () => {
+    if (!capturedBlob) {
+        alert('No photo captured');
+        return;
+    }
+
+    // Show progress
+    uploadProgress.style.display = 'block';
+    uploadBtn.disabled = true;
+    retakeBtn.disabled = true;
+
+    // Create form data
+    const formData = new FormData();
+    formData.append('receipt_image', capturedBlob, 'receipt.jpg');
+    formData.append('transaction_id', '{{ transaction.id }}');
+
+    try {
+        const response = await fetch('{{ url_for("receipts.api_upload") }}', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Success! Redirect to transactions
+            window.location.href = '{{ url_for("transactions.list_transactions") }}';
+        } else {
+            errorMessage.textContent = 'Error: ' + (result.error || 'Unknown error');
+            errorMessage.style.display = 'block';
+            uploadProgress.style.display = 'none';
+            uploadBtn.disabled = false;
+            retakeBtn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        errorMessage.textContent = 'Error uploading receipt. Please try again.';
+        errorMessage.style.display = 'block';
+        uploadProgress.style.display = 'none';
+        uploadBtn.disabled = false;
+        retakeBtn.disabled = false;
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Insights History - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-history"></i> Insights History</h1>
+                <p class="text-muted">View all past financial insights</p>
+            </div>
+            <a href="{{ url_for('financial_advisor.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Advisor
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="severity" class="form-label">Severity</label>
+                        <select class="form-select" id="severity" name="severity">
+                            <option value="">All Severities</option>
+                            <option value="critical" {% if request.args.get('severity') == 'critical' %}selected{% endif %}>Critical</option>
+                            <option value="warning" {% if request.args.get('severity') == 'warning' %}selected{% endif %}>Warning</option>
+                            <option value="info" {% if request.args.get('severity') == 'info' %}selected{% endif %}>Info</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="type" class="form-label">Type</label>
+                        <select class="form-select" id="type" name="type">
+                            <option value="">All Types</option>
+                            {% for itype in insight_types %}
+                                <option value="{{ itype }}" {% if request.args.get('type') == itype %}selected{% endif %}>
+                                    {{ itype.replace('_', ' ').title() }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label d-block">&nbsp;</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="show_dismissed" name="show_dismissed"
+                                   value="true" {% if show_dismissed %}checked{% endif %}>
+                            <label class="form-check-label" for="show_dismissed">
+                                Show Dismissed
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                        <a href="{{ url_for('financial_advisor.insights_history') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Total Insights</h5>
+                <h2>{{ total_insights }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Average Impact</h5>
+                <h2>{{ avg_impact|currency }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Insights List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">All Insights ({{ insights|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% if insights %}
+                    <div class="list-group">
+                        {% for insight in insights %}
+                            <div class="list-group-item {% if insight.is_dismissed %}opacity-50{% endif %}">
+                                <div class="d-flex w-100 justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <h6 class="mb-0 me-2">{{ insight.title }}</h6>
+                                            {% if insight.severity == 'critical' %}
+                                                <span class="badge bg-danger">Critical</span>
+                                            {% elif insight.severity == 'warning' %}
+                                                <span class="badge bg-warning">Warning</span>
+                                            {% else %}
+                                                <span class="badge bg-info">Info</span>
+                                            {% endif %}
+                                            <span class="badge bg-secondary ms-2">{{ insight.insight_type.replace('_', ' ').title() }}</span>
+                                            {% if insight.is_dismissed %}
+                                                <span class="badge bg-dark ms-2">Dismissed</span>
+                                            {% endif %}
+                                        </div>
+                                        <p class="mb-1">{{ insight.description }}</p>
+                                        <div class="d-flex justify-content-between">
+                                            <small class="text-muted">
+                                                <i class="far fa-clock"></i> {{ insight.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                            </small>
+                                            {% if insight.amount_impact %}
+                                                <small>
+                                                    <strong>Impact:</strong> {{ insight.amount_impact|currency }}
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% if not insight.is_dismissed %}
+                                        <form method="POST" action="{{ url_for('financial_advisor.dismiss_insight', insight_id=insight.id) }}"
+                                              style="display: inline;" class="ms-3">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-times"></i> Dismiss
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No insights match your filters.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

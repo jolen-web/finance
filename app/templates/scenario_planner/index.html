@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Scenario Planning & Forecasting - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h1><i class="fas fa-crystal-ball"></i> Scenario Planning & Forecasting</h1>
+        <p class="text-muted">Model financial scenarios and forecast future outcomes</p>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Total Scenarios</h5>
+                <h2>{{ scenarios|length }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Avg Monthly Income</h5>
+                <h2>{{ historical.avg_monthly_income|currency }}</h2>
+                <small class="text-muted">Last 3 months</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Avg Monthly Expenses</h5>
+                <h2>{{ historical.avg_monthly_expenses|currency }}</h2>
+                <small class="text-muted">Last 3 months</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create New Scenario -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Create New Scenario</h5>
+            </div>
+            <div class="card-body">
+                <p>Choose a scenario type to model your financial future:</p>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <a href="{{ url_for('scenario_planner.new_scenario') }}?type=cash_flow_forecast" class="btn btn-outline-primary w-100 p-3">
+                            <i class="fas fa-chart-line fa-2x mb-2"></i>
+                            <h6>Cash Flow Forecast</h6>
+                            <small>Project future income and expenses</small>
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{{ url_for('scenario_planner.new_scenario') }}?type=savings_goal" class="btn btn-outline-success w-100 p-3">
+                            <i class="fas fa-piggy-bank fa-2x mb-2"></i>
+                            <h6>Savings Goal</h6>
+                            <small>Plan to reach a savings target</small>
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{{ url_for('scenario_planner.new_scenario') }}?type=debt_payoff" class="btn btn-outline-danger w-100 p-3">
+                            <i class="fas fa-credit-card fa-2x mb-2"></i>
+                            <h6>Debt Payoff</h6>
+                            <small>Calculate debt elimination timeline</small>
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{{ url_for('scenario_planner.new_scenario') }}?type=retirement" class="btn btn-outline-warning w-100 p-3">
+                            <i class="fas fa-umbrella-beach fa-2x mb-2"></i>
+                            <h6>Retirement Planning</h6>
+                            <small>Project retirement savings growth</small>
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{{ url_for('scenario_planner.new_scenario') }}?type=what_if" class="btn btn-outline-info w-100 p-3">
+                            <i class="fas fa-question-circle fa-2x mb-2"></i>
+                            <h6>What-If Analysis</h6>
+                            <small>Model hypothetical changes</small>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Existing Scenarios -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-list"></i> Your Scenarios</h5>
+            </div>
+            <div class="card-body">
+                {% if scenarios %}
+                    <div class="list-group">
+                        {% for scenario in scenarios %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            {{ scenario.name }}
+                                            <span class="badge bg-primary">{{ scenario.scenario_type.replace('_', ' ').title() }}</span>
+                                        </h6>
+                                        {% if scenario.description %}
+                                            <p class="mb-1">{{ scenario.description }}</p>
+                                        {% endif %}
+                                        <small class="text-muted">
+                                            <i class="far fa-calendar"></i> {{ scenario.duration_months }} months |
+                                            <i class="far fa-clock"></i> Created {{ scenario.created_at.strftime('%Y-%m-%d') }}
+                                        </small>
+                                    </div>
+                                    <div class="ms-3">
+                                        <a href="{{ url_for('scenario_planner.view_scenario', scenario_id=scenario.id) }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                        <form method="POST" action="{{ url_for('scenario_planner.delete', scenario_id=scenario.id) }}"
+                                              style="display: inline;"
+                                              onsubmit="return confirm('Delete this scenario?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No scenarios created yet. Create your first scenario to start planning your financial future!
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- How It Works -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-question-circle"></i> How Scenario Planning Works</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-chart-line"></i> Cash Flow Forecast</h6>
+                        <p>Project your future cash position based on expected income and expenses, with adjustable growth rates.</p>
+
+                        <h6><i class="fas fa-piggy-bank"></i> Savings Goal</h6>
+                        <p>Calculate how long it will take to reach a savings goal with regular contributions and interest.</p>
+
+                        <h6><i class="fas fa-credit-card"></i> Debt Payoff</h6>
+                        <p>Create a payoff schedule for loans or credit cards, including interest calculations.</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-umbrella-beach"></i> Retirement Planning</h6>
+                        <p>Model retirement savings growth with employee contributions, employer matching, and compound returns.</p>
+
+                        <h6><i class="fas fa-question-circle"></i> What-If Analysis</h6>
+                        <p>Explore hypothetical scenarios like job changes, new expenses, or income adjustments.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

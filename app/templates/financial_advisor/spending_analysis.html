@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Spending Analysis - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-chart-line"></i> Detailed Spending Analysis</h1>
+                <p class="text-muted">{{ start_date.strftime('%Y-%m-%d') }} to {{ end_date.strftime('%Y-%m-%d') }}</p>
+            </div>
+            <a href="{{ url_for('financial_advisor.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Advisor
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Savings Rate -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-piggy-bank"></i> Savings Rate</h5>
+            </div>
+            <div class="card-body">
+                {% if savings_rate %}
+                    <h2 class="text-center
+                        {% if savings_rate.savings_rate >= 20 %}text-success
+                        {% elif savings_rate.savings_rate >= 10 %}text-primary
+                        {% else %}text-warning{% endif %}">
+                        {{ savings_rate.savings_rate|round(1) }}%
+                    </h2>
+                    <p class="text-center text-muted mb-3">of income saved</p>
+                    <hr>
+                    <p><strong>Total Income:</strong> {{ savings_rate.total_income|currency }}</p>
+                    <p><strong>Total Expenses:</strong> {{ savings_rate.total_expenses|currency }}</p>
+                    <p><strong>Net Savings:</strong> {{ savings_rate.net_savings|currency }}</p>
+                    <hr>
+                    <div class="alert
+                        {% if savings_rate.savings_rate >= 20 %}alert-success
+                        {% elif savings_rate.savings_rate >= 10 %}alert-info
+                        {% else %}alert-warning{% endif %}">
+                        {{ savings_rate.recommendation }}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No data available for this period.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Emergency Fund -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-shield-alt"></i> Emergency Fund Check</h5>
+            </div>
+            <div class="card-body">
+                {% if emergency_fund %}
+                    <h2 class="text-center
+                        {% if emergency_fund.months_covered >= 6 %}text-success
+                        {% elif emergency_fund.months_covered >= 3 %}text-primary
+                        {% else %}text-danger{% endif %}">
+                        {{ emergency_fund.months_covered|round(1) }}
+                    </h2>
+                    <p class="text-center text-muted mb-3">months of expenses covered</p>
+                    <hr>
+                    <p><strong>Total Savings:</strong> {{ emergency_fund.total_balance|currency }}</p>
+                    <p><strong>Avg Monthly Expenses:</strong> {{ emergency_fund.avg_monthly_expenses|currency }}</p>
+                    <p><strong>Recommended Fund:</strong> {{ emergency_fund.recommended_amount|currency }}</p>
+                    <hr>
+                    <div class="alert
+                        {% if emergency_fund.months_covered >= 6 %}alert-success
+                        {% elif emergency_fund.months_covered >= 3 %}alert-info
+                        {% else %}alert-danger{% endif %}">
+                        {{ emergency_fund.recommendation }}
+                    </div>
+                {% else %}
+                    <p class="text-muted">Unable to calculate emergency fund status.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Spending Spikes -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Spending Spikes</h5>
+            </div>
+            <div class="card-body">
+                {% if spikes %}
+                    <p class="text-muted mb-3">Categories with significant spending increases (≥40% increase)</p>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Previous Month</th>
+                                    <th>Current Month</th>
+                                    <th>Increase</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for spike in spikes %}
+                                    <tr>
+                                        <td><span class="badge bg-primary">{{ spike.category_name }}</span></td>
+                                        <td>{{ spike.previous_amount|currency }}</td>
+                                        <td>{{ spike.current_amount|currency }}</td>
+                                        <td class="text-danger">+{{ spike.increase_amount|currency }}</td>
+                                        <td>
+                                            <span class="badge
+                                                {% if spike.percentage_increase >= 100 %}bg-danger
+                                                {% elif spike.percentage_increase >= 70 %}bg-warning
+                                                {% else %}bg-info{% endif %}">
+                                                +{{ spike.percentage_increase|round(1) }}%
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> No unusual spending spikes detected. Your spending patterns are consistent.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Subscription Creep -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-sync-alt"></i> Recurring Charges (Subscription Creep)</h5>
+            </div>
+            <div class="card-body">
+                {% if subscriptions %}
+                    <p class="text-muted mb-3">Detected recurring charges that appear monthly</p>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Payee</th>
+                                    <th>Avg Amount</th>
+                                    <th>Frequency</th>
+                                    <th>Total Spent</th>
+                                    <th>Annual Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sub in subscriptions %}
+                                    <tr>
+                                        <td>{{ sub.payee }}</td>
+                                        <td>{{ sub.avg_amount|currency }}</td>
+                                        <td>
+                                            <span class="badge bg-info">{{ sub.frequency }} times</span>
+                                        </td>
+                                        <td>{{ sub.total_amount|currency }}</td>
+                                        <td class="text-danger">
+                                            <strong>{{ sub.annual_cost|currency }}</strong>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-warning">
+                                    <th colspan="4" class="text-end">Total Annual Subscription Cost:</th>
+                                    <th class="text-danger">
+                                        {{ subscriptions|sum(attribute='annual_cost')|currency }}
+                                    </th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-lightbulb"></i> Review these recurring charges regularly. Cancel unused subscriptions to save money!
+                    </div>
+                {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> No recurring charges detected in this period.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Duplicate Transactions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-copy"></i> Potential Duplicate Transactions</h5>
+            </div>
+            <div class="card-body">
+                {% if duplicates %}
+                    <p class="text-muted mb-3">Transactions with the same amount, payee, and date</p>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Payee</th>
+                                    <th>Amount</th>
+                                    <th>Account</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for dup in duplicates %}
+                                    <tr class="table-warning">
+                                        <td>{{ dup.date.strftime('%Y-%m-%d') }}</td>
+                                        <td>{{ dup.payee }}</td>
+                                        <td>{{ dup.amount|currency }}</td>
+                                        <td>{{ dup.account.name }}</td>
+                                        <td>
+                                            <a href="{{ url_for('transactions.edit_transaction', id=dup.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> Review
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i> Review these transactions to ensure they aren't duplicates.
+                    </div>
+                {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> No potential duplicate transactions found.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

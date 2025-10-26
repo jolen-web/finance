@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{% if asset %}Edit Asset{% else %}New Asset{% endif %} - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h4>{% if asset %}Edit Asset{% else %}Add New Asset{% endif %}</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Asset Name *</label>
+                        <input type="text" class="form-control" id="name" name="name"
+                               placeholder="e.g., My House, Toyota Camry, Gaming Laptop"
+                               value="{{ asset.name if asset else '' }}" required>
+                        <small class="form-text text-muted">Give your asset a descriptive name</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="asset_type" class="form-label">Asset Type *</label>
+                        <select class="form-select" id="asset_type" name="asset_type" required>
+                            <option value="">Select asset type...</option>
+                            <option value="house" {% if asset and asset.asset_type == 'house' %}selected{% endif %}>House</option>
+                            <option value="lot" {% if asset and asset.asset_type == 'lot' %}selected{% endif %}>Lot</option>
+                            <option value="vehicle" {% if asset and asset.asset_type == 'vehicle' %}selected{% endif %}>Vehicle</option>
+                            <option value="electronics" {% if asset and asset.asset_type == 'electronics' %}selected{% endif %}>Electronics</option>
+                            <option value="jewelry" {% if asset and asset.asset_type == 'jewelry' %}selected{% endif %}>Jewelry</option>
+                            <option value="art" {% if asset and asset.asset_type == 'art' %}selected{% endif %}>Art</option>
+                            <option value="collectible" {% if asset and asset.asset_type == 'collectible' %}selected{% endif %}>Collectible</option>
+                            <option value="other" {% if asset and asset.asset_type == 'other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="purchase_price" class="form-label">Purchase Price</label>
+                            <input type="number" class="form-control" id="purchase_price" name="purchase_price"
+                                   placeholder="0.00" step="0.01" min="0"
+                                   value="{{ asset.purchase_price if asset and asset.purchase_price else '' }}">
+                            <small class="form-text text-muted">Original cost (optional)</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="current_value" class="form-label">Current Value *</label>
+                            <input type="number" class="form-control" id="current_value" name="current_value"
+                                   placeholder="0.00" step="0.01" min="0"
+                                   value="{{ asset.current_value if asset else '' }}" required>
+                            <small class="form-text text-muted">Estimated current worth</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="purchase_date" class="form-label">Purchase Date</label>
+                        <input type="date" class="form-control" id="purchase_date" name="purchase_date"
+                               value="{{ asset.purchase_date.strftime('%Y-%m-%d') if asset and asset.purchase_date else '' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"
+                                  placeholder="Add any additional notes about this asset...">{{ asset.notes if asset else '' }}</textarea>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('assets.list_assets') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if asset %}Update Asset{% else %}Add Asset{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

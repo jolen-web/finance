@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}{{ scenario.name }} - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1>{{ scenario.name }}</h1>
+                <p class="text-muted">
+                    <span class="badge bg-primary">{{ scenario.scenario_type.replace('_', ' ').title() }}</span>
+                    {{ scenario.duration_months }} months | Created {{ scenario.created_at.strftime('%Y-%m-%d') }}
+                </p>
+                {% if scenario.description %}
+                    <p>{{ scenario.description }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <button onclick="window.print()" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <a href="{{ url_for('scenario_planner.index') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cash Flow Forecast Results -->
+{% if scenario.scenario_type == 'cash_flow_forecast' %}
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Starting Balance</h6>
+                    <h4>{{ results.starting_balance|currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Projected Ending Balance</h6>
+                    <h4 class="{% if results.ending_balance >= results.starting_balance %}text-success{% else %}text-danger{% endif %}">
+                        {{ results.ending_balance|currency }}
+                    </h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Income</h6>
+                    <h4 class="text-success">{{ results.total_income|currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Expenses</h6>
+                    <h4 class="text-danger">{{ results.total_expenses|currency }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Monthly Projection</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Income</th>
+                                    <th>Expenses</th>
+                                    <th>Net Cash Flow</th>
+                                    <th>Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for month_data in results.forecast %}
+                                    <tr>
+                                        <td>{{ month_data.month }}</td>
+                                        <td class="text-success">{{ month_data.income|currency }}</td>
+                                        <td class="text-danger">{{ month_data.expenses|currency }}</td>
+                                        <td class="{% if month_data.net_cash_flow >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                            {{ month_data.net_cash_flow|currency }}
+                                        </td>
+                                        <td><strong>{{ month_data.balance|currency }}</strong></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Savings Goal Results -->
+{% if scenario.scenario_type == 'savings_goal' %}
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Goal Amount</h6>
+                    <h4>{{ results.goal_amount|currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Projected Balance</h6>
+                    <h4>{{ results.ending_balance|currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card {% if results.goal_achievable %}border-success{% else %}border-danger{% endif %}">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Months to Goal</h6>
+                    <h4 class="{% if results.goal_achievable %}text-success{% else %}text-danger{% endif %}">
+                        {% if results.months_to_goal %}
+                            {{ results.months_to_goal }}
+                        {% else %}
+                            Not achieved
+                        {% endif %}
+                    </h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Goal Status</h6>
+                    <h5>
+                        {% if results.goal_achievable %}
+                            <span class="badge bg-success">Achievable</span>
+                        {% else %}
+                            <span class="badge bg-danger">Shortfall: {{ results.shortfall|currency }}</span>
+                        {% endif %}
+                    </h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Progress Towards Goal</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Balance</th>
+                                    <th>Contribution</th>
+                                    <th>Interest Earned</th>
+                                    <th>Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for month_data in results.progress %}
+                                    <tr {% if month_data.progress_percentage >= 100 %}class="table-success"{% endif %}>
+                                        <td>{{ month_data.month }}</td>
+                                        <td><strong>{{ month_data.balance|currency }}</strong></td>
+                                        <td>{{ month_data.contribution|currency }}</td>
+                                        <td class="text-success">{{ month_data.interest_earned|currency }}</td>
+                                        <td>
+                                            <div class="progress" style="width: 100px;">
+                                                <div class="progress-bar" role="progressbar"
+                                                     style="width: {{ [month_data.progress_percentage, 100]|min }}%">
+                                                    {{ month_data.progress_percentage|round|int }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Debt Payoff Results -->
+{% if scenario.scenario_type == 'debt_payoff' %}
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Original Debt</h6>
+                    <h4 class="text-danger">{{ results.original_principal|currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Interest</h6>
+                    <h4 class="text-warning">{{ results.total_interest|currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Payoff Time</h6>
+                    <h4>
+                        {% if results.payoff_month %}
+                            {{ results.payoff_month }} months
+                        {% else %}
+                            Not paid off
+                        {% endif %}
+                    </h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card {% if results.paid_off %}border-success{% else %}border-danger{% endif %}">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Status</h6>
+                    <h5>
+                        {% if results.paid_off %}
+                            <span class="badge bg-success">Paid Off!</span>
+                        {% else %}
+                            <span class="badge bg-danger">{{ results.remaining_balance|currency }} remaining</span>
+                        {% endif %}
+                    </h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Payoff Schedule</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Payment</th>
+                                    <th>Principal</th>
+                                    <th>Interest</th>
+                                    <th>Remaining Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for month_data in results.schedule %}
+                                    <tr {% if month_data.remaining_balance == 0 %}class="table-success"{% endif %}>
+                                        <td>{{ month_data.month }}</td>
+                                        <td>{{ month_data.payment|currency }}</td>
+                                        <td class="text-success">{{ month_data.principal|currency }}</td>
+                                        <td class="text-danger">{{ month_data.interest|currency }}</td>
+                                        <td><strong>{{ month_data.remaining_balance|currency }}</strong></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Retirement Results -->
+{% if scenario.scenario_type == 'retirement' %}
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Starting Balance</h6>
+                    <h4>{{ results.starting_balance|currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Projected at Retirement</h6>
+                    <h3 class="text-success">{{ results.projected_balance_at_retirement|currency }}</h3>
+                    <small class="text-muted">at age {{ results.retirement_age }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Investment Growth</h6>
+                    <h4 class="text-info">{{ results.total_investment_growth|currency }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Your Contributions</h6>
+                    <h5>{{ results.total_employee_contributions|currency }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Employer Match</h6>
+                    <h5 class="text-success">{{ results.total_employer_match|currency }}</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- What-If Results -->
+{% if scenario.scenario_type == 'what_if' %}
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Baseline (Current)</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Income:</strong> {{ results.baseline.income|currency }}/month</p>
+                    <p><strong>Expenses:</strong> {{ results.baseline.expenses|currency }}/month</p>
+                    <p><strong>Net:</strong> <span class="{% if results.baseline.net >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ results.baseline.net|currency }}/month
+                    </span></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">Scenario (What-If)</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Income:</strong> {{ results.scenario.income|currency }}/month
+                        <small class="{% if results.changes.income_change >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            ({{ results.changes.income_change|currency }})
+                        </small>
+                    </p>
+                    <p><strong>Expenses:</strong> {{ results.scenario.expenses|currency }}/month
+                        <small class="{% if results.changes.expense_change <= 0 %}text-success{% else %}text-danger{% endif %}">
+                            ({{ results.changes.expense_change|currency }})
+                        </small>
+                    </p>
+                    <p><strong>Net:</strong> <span class="{% if results.scenario.net >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ results.scenario.net|currency }}/month
+                        <small>({{ results.changes.net_change|currency }})</small>
+                    </span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Starting Balance</h6>
+                    <h4>{{ results.starting_balance|currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Projected Ending Balance</h6>
+                    <h4 class="{% if results.ending_balance >= results.starting_balance %}text-success{% else %}text-danger{% endif %}">
+                        {{ results.ending_balance|currency }}
+                    </h4>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

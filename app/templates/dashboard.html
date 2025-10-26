@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Dashboard</h1>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title">Total Assets</h5>
+                <h2 class="card-text">{{ total_assets|currency }}</h2>
+                <small>Checking, Savings, Cash</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-danger">
+            <div class="card-body">
+                <h5 class="card-title">Total Liabilities</h5>
+                <h2 class="card-text">{{ total_liabilities|currency }}</h2>
+                <small>Credit Cards</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">Net Worth</h5>
+                <h2 class="card-text">{{ net_worth|currency }}</h2>
+                <small>Assets - Liabilities</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if prefs.show_accounts %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Accounts</h5>
+                <a href="{{ url_for('accounts.new_account') }}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i> Add Account
+                </a>
+            </div>
+            <div class="card-body">
+                {% if accounts %}
+                    <div class="list-group list-group-flush">
+                        {% for account in accounts %}
+                            <a href="{{ url_for('accounts.view_account', id=account.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ account.name }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ account.account_type|replace('_', ' ')|title }}</small>
+                                </div>
+                                <span class="badge {% if account.current_balance >= 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
+                                    {{ account.current_balance|currency }}
+                                </span>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No accounts yet. <a href="{{ url_for('accounts.new_account') }}">Create your first account</a></p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if prefs.show_transactions %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Recent Transactions</h5>
+                <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i> Add Transaction
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_transactions %}
+                    <div class="list-group list-group-flush">
+                        {% for transaction in recent_transactions %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ transaction.payee }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        {{ transaction.date.strftime('%Y-%m-%d') }} - {{ transaction.account.name }}
+                                        {% if transaction.is_cleared %}<i class="fas fa-check-circle text-success"></i>{% endif %}
+                                        {% if transaction.is_reconciled %}<i class="fas fa-shield-alt text-primary"></i>{% endif %}
+                                    </small>
+                                </div>
+                                <span class="{% if transaction.transaction_type == 'deposit' %}text-success{% else %}text-danger{% endif %}">
+                                    {{ transaction.amount|currency(true) if transaction.transaction_type == 'deposit' else (-transaction.amount)|currency }}
+                                </span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-sm btn-outline-primary">View All Transactions</a>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No transactions yet. <a href="{{ url_for('transactions.new_transaction') }}">Add your first transaction</a></p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

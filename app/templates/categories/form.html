@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{% if category %}Edit Category{% else %}New Category{% endif %} - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h4>{% if category %}Edit Category{% else %}New Category{% endif %}</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Category Name *</label>
+                        <input type="text" class="form-control" id="name" name="name"
+                               value="{{ category.name if category else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="parent_id" class="form-label">Parent Category</label>
+                        <select class="form-select" id="parent_id" name="parent_id">
+                            <option value="">None (Top-level category)</option>
+                            {% for parent_cat in parent_categories %}
+                                <option value="{{ parent_cat.id }}" {% if category and category.parent_id == parent_cat.id %}selected{% endif %}>
+                                    {{ parent_cat.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Select a parent to create a subcategory</small>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="is_income" name="is_income"
+                               {% if category and category.is_income %}checked{% endif %}>
+                        <label class="form-check-label" for="is_income">
+                            This is an income category
+                        </label>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('categories.list_categories') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if category %}Update Category{% else %}Create Category{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

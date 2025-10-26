@@ -1,0 +1,15 @@
+services:
+  finance-app:
+    build: .
+    container_name: finance-tracker
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_PORT=5001
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - .:/app
+      - /app/.venv
+    command: python run.py
+    restart: unless-stopped

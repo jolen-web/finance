@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}{% if investment %}Edit Investment{% else %}New Investment{% endif %} - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h4>{% if investment %}Edit Investment{% else %}New Investment{% endif %}</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Investment Name *</label>
+                                <input type="text" class="form-control" id="name" name="name"
+                                       value="{{ investment.name if investment else '' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="ticker" class="form-label">Ticker/Symbol</label>
+                                <input type="text" class="form-control" id="ticker" name="ticker"
+                                       value="{{ investment.ticker if investment else '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="investment_type" class="form-label">Investment Type *</label>
+                                <select class="form-select" id="investment_type" name="investment_type" required>
+                                    <option value="">Select type...</option>
+                                    <option value="stock" {% if investment and investment.investment_type == 'stock' %}selected{% endif %}>Stock</option>
+                                    <option value="bond" {% if investment and investment.investment_type == 'bond' %}selected{% endif %}>Bond</option>
+                                    <option value="etf" {% if investment and investment.investment_type == 'etf' %}selected{% endif %}>ETF</option>
+                                    <option value="mutual_fund" {% if investment and investment.investment_type == 'mutual_fund' %}selected{% endif %}>Mutual Fund</option>
+                                    <option value="cryptocurrency" {% if investment and investment.investment_type == 'cryptocurrency' %}selected{% endif %}>Cryptocurrency</option>
+                                    <option value="real_estate" {% if investment and investment.investment_type == 'real_estate' %}selected{% endif %}>Real Estate</option>
+                                    <option value="other" {% if investment and investment.investment_type == 'other' %}selected{% endif %}>Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="category_id" class="form-label">Category</label>
+                                <select class="form-select" id="category_id" name="category_id">
+                                    <option value="">No Category</option>
+                                    {% for category in categories %}
+                                        <option value="{{ category.id }}" {% if investment and investment.category_id == category.id %}selected{% endif %}>
+                                            {{ category.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="quantity" class="form-label">Quantity *</label>
+                                <input type="number" step="0.01" class="form-control" id="quantity" name="quantity"
+                                       value="{{ investment.quantity if investment else '' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="purchase_price" class="form-label">Purchase Price per Unit *</label>
+                                <input type="number" step="0.01" class="form-control" id="purchase_price" name="purchase_price"
+                                       value="{{ investment.purchase_price if investment else '' }}" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="current_price" class="form-label">Current Price per Unit</label>
+                                <input type="number" step="0.01" class="form-control" id="current_price" name="current_price"
+                                       value="{{ investment.current_price if investment else '' }}">
+                                <small class="text-muted">Leave blank if not tracking current price</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="purchase_date" class="form-label">Purchase Date</label>
+                                <input type="date" class="form-control" id="purchase_date" name="purchase_date"
+                                       value="{% if investment and investment.purchase_date %}{{ investment.purchase_date.strftime('%Y-%m-%d') }}{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="account_id" class="form-label">Associated Account</label>
+                        <select class="form-select" id="account_id" name="account_id">
+                            <option value="">No Account</option>
+                            {% for account in accounts %}
+                                <option value="{{ account.id }}" {% if investment and investment.account_id == account.id %}selected{% endif %}>
+                                    {{ account.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3">{{ investment.notes if investment else '' }}</textarea>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('investments.index') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if investment %}Update Investment{% else %}Create Investment{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

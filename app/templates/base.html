@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Finance Tracker{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+                <i class="fas fa-wallet"></i> Finance Tracker
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if current_user.is_authenticated %}
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.index') }}">
+                            <i class="fas fa-home"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('accounts.list_accounts') }}">
+                            <i class="fas fa-university"></i> Accounts
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('transactions.list_transactions') }}">
+                            <i class="fas fa-list"></i> Transactions
+                        </a>
+                    </li>
+                    {% if prefs and prefs.show_assets %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('assets.list_assets') }}">
+                            <i class="fas fa-home"></i> Assets
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% if prefs and prefs.show_investments %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('investments.index') }}">
+                            <i class="fas fa-chart-line"></i> Investments
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% if prefs and prefs.show_receipts %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('receipts.index') }}">
+                            <i class="fas fa-receipt"></i> Expense Records
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="financialToolsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-tools"></i> Financial Tools
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="financialToolsDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('ai_categorizer.index') }}">
+                                <i class="fas fa-tags"></i> Transaction Categorizer
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('financial_advisor.index') }}">
+                                <i class="fas fa-heartbeat"></i> Financial Advisor
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('tax_assistant.index') }}">
+                                <i class="fas fa-file-invoice-dollar"></i> Tax Assistant
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('scenario_planner.index') }}">
+                                <i class="fas fa-crystal-ball"></i> Scenario Planner
+                            </a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/backup/backup-restore">
+                            <i class="fas fa-cloud-download-alt"></i> Backup
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('transactions.new_transaction') }}">
+                            <i class="fas fa-plus-circle"></i> Quick Add
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle"></i> {{ current_user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('settings.index') }}">
+                                <i class="fas fa-cog"></i> Settings
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
+                                <i class="fas fa-sign-out-alt"></i> Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                {% else %}
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('auth.login') }}">
+                            <i class="fas fa-sign-in-alt"></i> Login
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('auth.register') }}">
+                            <i class="fas fa-user-plus"></i> Register
+                        </a>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

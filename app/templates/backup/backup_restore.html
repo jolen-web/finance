@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Backup & Restore - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h1>Backup & Restore</h1>
+        <p class="text-muted">Export your data to a JSON file or restore from a previous backup</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-download"></i> Export Data</h5>
+            </div>
+            <div class="card-body">
+                <p>Download all your financial data as a JSON file. This includes:</p>
+                <ul>
+                    <li>All accounts</li>
+                    <li>All transactions</li>
+                    <li>All categories</li>
+                </ul>
+                <p class="text-muted"><small>Keep this backup file in a safe place. You can use it to restore your data later.</small></p>
+                <a href="{{ url_for('backup.export_data') }}" class="btn btn-primary">
+                    <i class="fas fa-download"></i> Export All Data
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-upload"></i> Import Data</h5>
+            </div>
+            <div class="card-body">
+                <p>Restore your financial data from a JSON backup file.</p>
+
+                <form method="POST" action="{{ url_for('backup.import_data') }}" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="backup_file" class="form-label">Select Backup File</label>
+                        <input type="file" class="form-control" id="backup_file" name="backup_file" accept=".json" required>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="clear_existing" name="clear_existing" value="yes">
+                        <label class="form-check-label" for="clear_existing">
+                            Clear existing data before import
+                        </label>
+                        <small class="form-text text-muted d-block">
+                            Warning: This will delete all current accounts and transactions before importing
+                        </small>
+                    </div>
+
+                    <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure you want to import this data? This action cannot be undone.');">
+                        <i class="fas fa-upload"></i> Import Data
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <h5 class="alert-heading"><i class="fas fa-info-circle"></i> Backup Tips</h5>
+            <ul class="mb-0">
+                <li>Export your data regularly to prevent data loss</li>
+                <li>Store backup files in multiple locations (external drive, cloud storage, etc.)</li>
+                <li>Test your backups periodically by importing them into a test instance</li>
+                <li>Keep multiple versions of backups from different dates</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

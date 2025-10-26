@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Tax Preparation Assistant - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h1><i class="fas fa-file-invoice-dollar"></i> Tax Preparation Assistant</h1>
+        <p class="text-muted">Track deductible expenses and prepare for tax filing</p>
+    </div>
+</div>
+
+<!-- Year Selector -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label for="year" class="form-label">Tax Year</label>
+                        <select class="form-select" id="year" name="year" onchange="this.form.submit()">
+                            {% for year in available_years %}
+                                <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>
+                                    {{ year }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-9">
+                        <div class="btn-group" role="group">
+                            <a href="{{ url_for('tax_assistant.suggestions', year=selected_year) }}" class="btn btn-primary">
+                                <i class="fas fa-lightbulb"></i> View Suggestions ({{ suggestions_count }})
+                            </a>
+                            <a href="{{ url_for('tax_assistant.tagged_transactions', year=selected_year) }}" class="btn btn-outline-primary">
+                                <i class="fas fa-tags"></i> All Tagged
+                            </a>
+                            <a href="{{ url_for('tax_assistant.year_end_summary', year=selected_year) }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-calendar-check"></i> Year-End Summary
+                            </a>
+                            <a href="{{ url_for('tax_assistant.export_csv', tax_year=selected_year) }}" class="btn btn-outline-success">
+                                <i class="fas fa-download"></i> Export CSV
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Total Deductions</h5>
+                <h2 class="text-success">{{ summary.total_deductions|currency }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Tagged Transactions</h5>
+                <h2>{{ summary.total_transactions }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Deduction Types</h5>
+                <h2>{{ summary.by_type|length }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Pending Suggestions</h5>
+                <h2 class="text-warning">{{ suggestions_count }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Deductions by Type -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Deductions by Type</h5>
+            </div>
+            <div class="card-body">
+                {% if summary.by_type %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Deduction Type</th>
+                                    <th>Count</th>
+                                    <th>Total Amount</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for deduction_type, data in summary.by_type.items() %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-primary">
+                                                {{ deduction_categories.get(deduction_type, {}).get('name', deduction_type.replace('_', ' ').title()) }}
+                                            </span>
+                                        </td>
+                                        <td>{{ data.count }}</td>
+                                        <td><strong>{{ data.total|currency }}</strong></td>
+                                        <td>
+                                            <a href="{{ url_for('tax_assistant.tagged_transactions', year=selected_year, type=deduction_type) }}"
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-success">
+                                <tr>
+                                    <th>Total</th>
+                                    <th>{{ summary.total_transactions }}</th>
+                                    <th><strong>{{ summary.total_deductions|currency }}</strong></th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No tax deductions tagged for {{ selected_year }} yet.
+                        <a href="{{ url_for('tax_assistant.suggestions', year=selected_year) }}">View suggestions</a> to get started.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Tags -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-clock"></i> Recent Tags</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_tags %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Payee</th>
+                                    <th>Amount</th>
+                                    <th>Type</th>
+                                    <th>Deduction %</th>
+                                    <th>Deductible</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tag in recent_tags %}
+                                    {% set transaction = tag.transaction %}
+                                    {% if transaction %}
+                                        <tr>
+                                            <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
+                                            <td>{{ transaction.payee }}</td>
+                                            <td>{{ transaction.amount|currency }}</td>
+                                            <td>
+                                                <span class="badge bg-secondary">
+                                                    {{ deduction_categories.get(tag.deduction_type, {}).get('name', tag.deduction_type) }}
+                                                </span>
+                                            </td>
+                                            <td>{{ tag.deduction_percentage }}%</td>
+                                            <td><strong>{{ (transaction.amount|abs * (tag.deduction_percentage / 100))|currency }}</strong></td>
+                                            <td>
+                                                <form method="POST" action="{{ url_for('tax_assistant.untag_transaction', tag_id=tag.id) }}"
+                                                      style="display: inline;"
+                                                      onsubmit="return confirm('Remove tax tag?');">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No recent tags.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Help Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-question-circle"></i> How It Works</h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li><strong>Review Suggestions:</strong> We automatically scan your transactions for potential tax deductions based on common keywords and categories.</li>
+                    <li><strong>Tag Transactions:</strong> Mark transactions as deductible with the appropriate deduction type and percentage.</li>
+                    <li><strong>Track Progress:</strong> View your total deductions and breakdown by category throughout the year.</li>
+                    <li><strong>Export Data:</strong> Download a CSV file of all tagged deductions for your tax preparer or tax software.</li>
+                    <li><strong>Year-End Summary:</strong> Generate a comprehensive financial summary for tax filing.</li>
+                </ol>
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle"></i> <strong>Disclaimer:</strong> This tool is for tracking purposes only.
+                    Consult with a tax professional for advice on what is deductible for your specific situation.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

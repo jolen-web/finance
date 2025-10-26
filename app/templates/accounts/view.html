@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}{{ account.name }} - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1>{{ account.name }}</h1>
+                <p class="text-muted">{{ account.account_type|replace('_', ' ')|title }}</p>
+            </div>
+            <div>
+                <a href="{{ url_for('accounts.edit_account', id=account.id) }}" class="btn btn-outline-primary">
+                    <i class="fas fa-pencil-alt"></i> Edit
+                </a>
+                <a href="{{ url_for('accounts.list_accounts') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Starting Balance</h5>
+                <h3>{{ account.starting_balance|currency }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Current Balance</h5>
+                <h3 class="{% if account.current_balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ account.current_balance|currency }}
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Transactions</h5>
+                <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i> Add Transaction
+                </a>
+            </div>
+            <div class="card-body">
+                {% if transactions %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Payee</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in transactions %}
+                                    <tr>
+                                        <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
+                                        <td>{{ transaction.payee }}</td>
+                                        <td>{{ transaction.category.name if transaction.category else '-' }}</td>
+                                        <td class="{% if transaction.transaction_type == 'deposit' %}text-success{% else %}text-danger{% endif %}">
+                                            {{ transaction.amount|currency(true) if transaction.transaction_type == 'deposit' else (-transaction.amount)|currency }}
+                                        </td>
+                                        <td>
+                                            <form action="{{ url_for('transactions.toggle_cleared', id=transaction.id) }}" method="POST" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Cleared">
+                                                    {% if transaction.is_cleared %}
+                                                        <i class="fas fa-check-circle text-success"></i>
+                                                    {% else %}
+                                                        <i class="far fa-circle text-muted"></i>
+                                                    {% endif %}
+                                                </button>
+                                            </form>
+                                            <form action="{{ url_for('transactions.toggle_reconciled', id=transaction.id) }}" method="POST" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Reconciled">
+                                                    {% if transaction.is_reconciled %}
+                                                        <i class="fas fa-shield-alt text-primary"></i>
+                                                    {% else %}
+                                                        <i class="far fa-shield text-muted"></i>
+                                                    {% endif %}
+                                                </button>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('transactions.edit_transaction', id=transaction.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <p class="text-muted">No transactions yet for this account.</p>
+                        <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-primary">
+                            <i class="fas fa-plus-circle"></i> Add First Transaction
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

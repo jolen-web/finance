@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Investments - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="fas fa-chart-line"></i> Investments</h1>
+            <div>
+                <a href="{{ url_for('investments.new_investment') }}" class="btn btn-primary me-2">
+                    <i class="fas fa-plus-circle"></i> New Investment
+                </a>
+                <a href="{{ url_for('investments.categories') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-tags"></i> Manage Categories
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Portfolio Summary -->
+{% if investments %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted mb-2">Total Invested</h6>
+                <h3>{{ total_invested|currency }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted mb-2">Current Value</h6>
+                <h3>{{ total_current_value|currency }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted mb-2">Gain/Loss</h6>
+                <h3 class="{% if total_gain_loss >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ total_gain_loss|currency }}
+                </h3>
+                {% if total_invested > 0 %}
+                    <small class="text-muted">
+                        {{ "{:.1f}"|format((total_gain_loss / total_invested) * 100) }}%
+                    </small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted mb-2">Total Holdings</h6>
+                <h3>{{ investments|length }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Investment Holdings</h5>
+            </div>
+            <div class="card-body">
+                {% if investments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Category</th>
+                                    <th>Quantity</th>
+                                    <th>Current Price</th>
+                                    <th>Current Value</th>
+                                    <th>Gain/Loss</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for investment in investments %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ investment.name }}</strong>
+                                            {% if investment.ticker %}
+                                                <br><small class="text-muted">{{ investment.ticker }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ investment.investment_type|replace('_', ' ')|title }}</td>
+                                        <td>
+                                            {% if investment.category %}
+                                                <span class="badge" style="background-color: {{ investment.category.color }}">
+                                                    {{ investment.category.name }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Uncategorized</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ "{:,.2f}"|format(investment.quantity) }}</td>
+                                        <td>
+                                            {% if investment.current_price %}
+                                                {{ investment.current_price|currency }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if investment.current_value %}
+                                                {{ investment.current_value|currency }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% set gain_loss = investment.calculate_gain_loss() %}
+                                            {% set gain_loss_pct = investment.calculate_gain_loss_percentage() %}
+                                            <span class="{% if gain_loss >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                                {{ gain_loss|currency }}
+                                                {% if gain_loss_pct != 0 %}
+                                                    <br><small>({{ "{:.1f}"|format(gain_loss_pct) }}%)</small>
+                                                {% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('investments.edit_investment', id=investment.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </a>
+                                            <form action="{{ url_for('investments.delete_investment', id=investment.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this investment?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-chart-line" style="font-size: 3rem; color: #ccc;"></i>
+                        <p class="text-muted mt-3">No investments yet. Start building your investment portfolio!</p>
+                        <a href="{{ url_for('investments.new_investment') }}" class="btn btn-primary">
+                            <i class="fas fa-plus-circle"></i> Add Your First Investment
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

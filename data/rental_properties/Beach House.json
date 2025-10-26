@@ -1,0 +1,60 @@
+{
+  "property_name": "Beach House",
+  "created_date": "2025-10-26T08:13:36.947207",
+  "last_updated": "2025-10-26T08:14:10.133134",
+  "land_costs": [
+    {
+      "description": "Land acquisition",
+      "amount": 250000.0,
+      "date": "2020-01-15",
+      "category": "land",
+      "notes": ""
+    }
+  ],
+  "building_costs": [
+    {
+      "description": "Building cost",
+      "amount": 400000.0,
+      "date": "2020-02-01",
+      "category": "building",
+      "notes": ""
+    }
+  ],
+  "construction_in_progress": [],
+  "loans": [],
+  "loan_payments": [],
+  "key_dates": {
+    "purchase_date": "2020-01-15",
+    "placed_in_service_date": "2020-06-01",
+    "construction_start": null,
+    "construction_end": null,
+    "notes": ""
+  },
+  "operating_expenses": [
+    {
+      "description": "Insurance",
+      "amount": 1200.0,
+      "date": "2024-01-01",
+      "category": "insurance",
+      "notes": ""
+    },
+    {
+      "description": "Property Tax",
+      "amount": 3600.0,
+      "date": "2024-01-01",
+      "category": "property_tax",
+      "notes": ""
+    }
+  ],
+  "rental_income": [
+    {
+      "amount": 5000.0,
+      "date": "2024-01-01",
+      "tenant_name": "John Smith",
+      "notes": ""
+    }
+  ],
+  "depreciation_start_date": "2020-06-01",
+  "building_basis": 400000.0,
+  "land_basis": 250000.0
+}

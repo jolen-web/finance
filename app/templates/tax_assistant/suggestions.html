@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Tax Deduction Suggestions - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-lightbulb"></i> Tax Deduction Suggestions</h1>
+                <p class="text-muted">Review and tag potential deductible expenses for {{ selected_year }}</p>
+            </div>
+            <a href="{{ url_for('tax_assistant.index', year=selected_year) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Year Selector -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="year" class="form-label">Tax Year</label>
+                        <select class="form-select" id="year" name="year" onchange="this.form.submit()">
+                            {% for year in available_years %}
+                                <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>
+                                    {{ year }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Suggestions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Suggested Transactions ({{ suggestions|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% if suggestions %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Payee</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>Suggested Type</th>
+                                    <th>Deductible</th>
+                                    <th>Reason</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for suggestion in suggestions %}
+                                    {% set transaction = suggestion.transaction %}
+                                    <tr>
+                                        <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
+                                        <td>{{ transaction.payee }}</td>
+                                        <td>
+                                            {% if transaction.category %}
+                                                <span class="badge bg-secondary">{{ transaction.category.name }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ transaction.amount|currency }}</td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ suggestion.deduction_name }}</span>
+                                        </td>
+                                        <td><strong>{{ suggestion.deductible_amount|currency }}</strong></td>
+                                        <td><small class="text-muted">{{ suggestion.match_reason }}</small></td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-success"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#tagModal{{ transaction.id }}">
+                                                <i class="fas fa-tag"></i> Tag
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Tag Modal -->
+                                    <div class="modal fade" id="tagModal{{ transaction.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Tag Transaction as Deductible</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <form method="POST" action="{{ url_for('tax_assistant.tag_transaction') }}">
+                                                    <div class="modal-body">
+                                                        <input type="hidden" name="transaction_id" value="{{ transaction.id }}">
+                                                        <input type="hidden" name="tax_year" value="{{ selected_year }}">
+
+                                                        <div class="mb-3">
+                                                            <strong>Transaction:</strong> {{ transaction.payee }}<br>
+                                                            <strong>Date:</strong> {{ transaction.date.strftime('%Y-%m-%d') }}<br>
+                                                            <strong>Amount:</strong> {{ transaction.amount|currency }}
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label for="deduction_type{{ transaction.id }}" class="form-label">Deduction Type *</label>
+                                                            <select class="form-select" id="deduction_type{{ transaction.id }}" name="deduction_type" required>
+                                                                {% for dtype, info in deduction_categories.items() %}
+                                                                    <option value="{{ dtype }}"
+                                                                            {% if dtype == suggestion.deduction_type %}selected{% endif %}>
+                                                                        {{ info.name }}
+                                                                    </option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label for="deduction_percentage{{ transaction.id }}" class="form-label">Deduction Percentage</label>
+                                                            <input type="range" class="form-range"
+                                                                   id="deduction_percentage{{ transaction.id }}"
+                                                                   name="deduction_percentage"
+                                                                   min="0" max="100" value="{{ suggestion.suggested_percentage }}" step="5">
+                                                            <small class="text-muted">
+                                                                <span id="percentage_value{{ transaction.id }}">{{ suggestion.suggested_percentage }}</span>%
+                                                                (Deductible: <span id="deductible_value{{ transaction.id }}">{{ suggestion.deductible_amount|currency }}</span>)
+                                                            </small>
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label for="notes{{ transaction.id }}" class="form-label">Notes (Optional)</label>
+                                                            <textarea class="form-control" id="notes{{ transaction.id }}" name="notes" rows="2"></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-success">
+                                                            <i class="fas fa-tag"></i> Tag as Deductible
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <script>
+                                    document.getElementById('deduction_percentage{{ transaction.id }}').addEventListener('input', function(e) {
+                                        const percentage = e.target.value;
+                                        const amount = {{ transaction.amount|abs }};
+                                        const deductible = amount * (percentage / 100);
+                                        document.getElementById('percentage_value{{ transaction.id }}').textContent = percentage;
+                                        document.getElementById('deductible_value{{ transaction.id }}').textContent = deductible.toFixed(2);
+                                    });
+                                    </script>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> No suggestions found! All potential deductions for {{ selected_year }} have been reviewed.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
