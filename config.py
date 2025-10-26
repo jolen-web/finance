@@ -6,12 +6,19 @@ basedir = Path(__file__).parent.absolute()
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
 
-    # Database configuration - use /tmp for Cloud Run (writable), otherwise use local data dir
+    # Database configuration
     if os.environ.get('FLASK_ENV') == 'production':
-        # Cloud Run: use /tmp directory which is writable
-        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:////tmp/finance.db'
+        # Cloud Run with Cloud SQL PostgreSQL
+        # Connection via Unix socket: /cloudsql/PROJECT:REGION:INSTANCE
+        db_user = os.environ.get('DB_USER', 'postgres')
+        db_pass = os.environ.get('DB_PASSWORD', '')
+        db_name = os.environ.get('DB_NAME', 'finance')
+        cloud_sql_connection_name = os.environ.get('CLOUD_SQL_CONNECTION_NAME', 'jinolen:us-central1:finance-db')
+
+        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+            f'postgresql+psycopg2://{db_user}:{db_pass}@/{db_name}?host=/cloudsql/{cloud_sql_connection_name}'
     else:
-        # Local development: use data directory
+        # Local development: use SQLite in data directory
         SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
             f'sqlite:///{basedir / "data" / "finance.db"}'
 
