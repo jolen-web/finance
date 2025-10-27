@@ -58,7 +58,7 @@ class DatabaseManager:
 
     def create_user_database(self, user_id):
         """
-        Create a new database for a user.
+        Create a new database for a user and initialize schema.
 
         Args:
             user_id: The user ID
@@ -67,8 +67,32 @@ class DatabaseManager:
             True if successful, False otherwise
         """
         if self.flask_env == 'development':
-            # SQLite databases are created automatically on first connection
-            return True
+            # SQLite: Create database file and initialize schema
+            from app import db
+            from sqlalchemy import create_engine
+            from sqlalchemy.pool import StaticPool
+
+            try:
+                db_uri = self.get_database_uri(user_id)
+
+                # Create engine for user's database
+                engine_options = {
+                    'poolclass': StaticPool,
+                    'echo': False
+                }
+                engine = create_engine(db_uri, **engine_options)
+
+                # Create all tables in the user's database
+                with engine.begin() as connection:
+                    db.metadata.create_all(bind=connection)
+
+                engine.dispose()
+                return True
+            except Exception as e:
+                print(f'Error creating user database schema: {e}')
+                import traceback
+                traceback.print_exc()
+                return False
 
         # PostgreSQL: create database
         if not HAS_PSYCOPG2:

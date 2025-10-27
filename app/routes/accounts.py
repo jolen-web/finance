@@ -23,7 +23,6 @@ def new_account():
         starting_balance = float(request.form.get('starting_balance', 0))
 
         account = Account(
-            user_id=current_user.id,
             name=name,
             account_type=account_type,
             starting_balance=starting_balance,

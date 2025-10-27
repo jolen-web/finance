@@ -46,7 +46,7 @@ steps:
       - 'jinolen:us-central1:finance-db'
       - '--set-env-vars'
       - 'FLASK_ENV=production,DB_USER=postgres,DB_NAME=finance,CLOUD_SQL_CONNECTION_NAME=jinolen:us-central1:finance-db,GEMINI_API_KEY=AIzaSyDUKA2cFuBE7QDIK8uH36pSHv47IfmQze0'
-      - '--set-secrets'
+      - '--update-secrets'
       - 'DB_PASSWORD=finance-db-password:latest'
       - '--port'
       - '5000'
