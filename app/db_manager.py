@@ -87,6 +87,10 @@ class DatabaseManager:
                     db.metadata.create_all(bind=connection)
 
                 engine.dispose()
+
+                # Initialize default categories for the user
+                self._initialize_default_categories(user_id)
+
                 return True
             except Exception as e:
                 print(f'Error creating user database schema: {e}')
@@ -231,6 +235,78 @@ class DatabaseManager:
             return exists
         except psycopg2.Error as e:
             print(f'Error checking database: {e}')
+            return False
+
+    def _initialize_default_categories(self, user_id):
+        """
+        Initialize default categories for a new user.
+
+        Args:
+            user_id: The user ID
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            from app.models import Category
+            from app import db
+            from sqlalchemy import create_engine
+            from sqlalchemy.pool import StaticPool
+
+            db_uri = self.get_database_uri(user_id)
+
+            # Create a temporary engine for this user's database
+            engine_options = {
+                'poolclass': StaticPool,
+                'echo': False
+            }
+            engine = create_engine(db_uri, **engine_options)
+
+            # Default categories: expense categories and income categories
+            default_categories = [
+                # Expense categories
+                ('Groceries', False),
+                ('Utilities', False),
+                ('Transport', False),
+                ('Entertainment', False),
+                ('Healthcare', False),
+                ('Dining Out', False),
+                ('Shopping', False),
+                ('Subscriptions', False),
+                ('Insurance', False),
+                ('Other Expenses', False),
+                # Income categories
+                ('Salary', True),
+                ('Bonus', True),
+                ('Interest', True),
+                ('Dividends', True),
+                ('Other Income', True),
+            ]
+
+            with engine.begin() as connection:
+                # Create a temporary session bound to this connection
+                from sqlalchemy.orm import sessionmaker, Session
+                temp_session = Session(bind=connection)
+
+                for category_name, is_income in default_categories:
+                    # Check if category already exists
+                    existing = temp_session.query(Category).filter_by(
+                        name=category_name, is_income=is_income
+                    ).first()
+
+                    if not existing:
+                        category = Category(name=category_name, is_income=is_income)
+                        temp_session.add(category)
+
+                temp_session.commit()
+                temp_session.close()
+
+            engine.dispose()
+            return True
+        except Exception as e:
+            print(f'Error initializing default categories: {e}')
+            import traceback
+            traceback.print_exc()
             return False
 
 
