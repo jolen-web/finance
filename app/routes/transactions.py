@@ -63,8 +63,7 @@ def new_transaction():
             memo=memo,
             transaction_type=transaction_type,
             account_id=account_id,
-            category_id=category_id,
-            user_id=current_user.id
+            category_id=category_id
         )
 
         db.session.add(transaction)
@@ -232,16 +231,16 @@ def quick_add_transaction():
         except ValueError:
             return jsonify({'error': 'Invalid date or amount format'}), 400
 
-        # Verify account belongs to user
+        # Verify account exists
         account = Account.query.get(account_id)
-        if not account or account.user_id != current_user.id:
-            return jsonify({'error': 'Account not found or access denied'}), 403
+        if not account:
+            return jsonify({'error': 'Account not found'}), 404
 
-        # Verify category belongs to user if provided
+        # Verify category exists if provided
         if category_id:
             category = Category.query.get(category_id)
-            if not category or category.user_id != current_user.id:
-                return jsonify({'error': 'Category not found or access denied'}), 403
+            if not category:
+                return jsonify({'error': 'Category not found'}), 404
 
         # Create transaction
         transaction = Transaction(
@@ -251,8 +250,7 @@ def quick_add_transaction():
             memo=memo,
             transaction_type=transaction_type,
             account_id=account_id,
-            category_id=int(category_id) if category_id else None,
-            user_id=current_user.id
+            category_id=int(category_id) if category_id else None
         )
 
         db.session.add(transaction)
