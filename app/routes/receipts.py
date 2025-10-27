@@ -157,8 +157,7 @@ def bulk_import():
                     payee=trans_data.get('description', 'Unknown'),
                     amount=abs_amount,
                     category_id=category_id,
-                    transaction_type=trans_type,
-                    user_id=current_user.id
+                    transaction_type=trans_type
                 )
 
                 db.session.add(transaction)
@@ -325,8 +324,7 @@ def confirm_receipt():
             payee=merchant,
             transaction_type='withdrawal',
             account_id=int(account_id),
-            category_id=int(category_id) if category_id else None,
-            user_id=current_user.id
+            category_id=int(category_id) if category_id else None
         )
 
         db.session.add(transaction)
