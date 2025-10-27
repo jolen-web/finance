@@ -24,7 +24,6 @@ class TransactionCategorizer:
 
         # Step 1: Check cache for existing payee mapping
         cached = PayeeCategory.query.filter_by(
-            user_id=self.user_id,
             payee=payee
         ).first()
 
@@ -45,7 +44,7 @@ class TransactionCategorizer:
         """Use Gemini to suggest the best category for a transaction"""
         try:
             # Get available categories for this user
-            categories = Category.query.filter_by(user_id=self.user_id).all()
+            categories = Category.query.all()
             category_names = [cat.name for cat in categories]
 
             if not category_names:
@@ -123,7 +122,6 @@ Be strict - only use categories from the provided list."""
         try:
             # Check if already exists
             existing = PayeeCategory.query.filter_by(
-                user_id=self.user_id,
                 payee=payee,
                 category_id=category_id
             ).first()
@@ -135,7 +133,6 @@ Be strict - only use categories from the provided list."""
             else:
                 # Create new mapping
                 mapping = PayeeCategory(
-                    user_id=self.user_id,
                     payee=payee,
                     category_id=category_id
                 )
@@ -152,7 +149,6 @@ Be strict - only use categories from the provided list."""
         try:
             # Find or create
             mapping = PayeeCategory.query.filter_by(
-                user_id=self.user_id,
                 payee=payee
             ).first()
 
@@ -161,7 +157,6 @@ Be strict - only use categories from the provided list."""
                 mapping.frequency += 1
             else:
                 mapping = PayeeCategory(
-                    user_id=self.user_id,
                     payee=payee,
                     category_id=category_id
                 )
@@ -177,8 +172,8 @@ Be strict - only use categories from the provided list."""
 
     def get_cache_stats(self):
         """Get statistics about cached payee mappings"""
-        total = PayeeCategory.query.filter_by(user_id=self.user_id).count()
-        most_used = PayeeCategory.query.filter_by(user_id=self.user_id).order_by(
+        total = PayeeCategory.query.count()
+        most_used = PayeeCategory.query.order_by(
             PayeeCategory.frequency.desc()
         ).limit(10).all()
 
