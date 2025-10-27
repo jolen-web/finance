@@ -10,14 +10,14 @@ bp = Blueprint('main', __name__)
 def index():
     """Dashboard view showing account summary and recent transactions"""
     # Get or create dashboard preferences for user
-    prefs = DashboardPreferences.query.filter_by(user_id=current_user.id).first()
+    prefs = DashboardPreferences.query.first()
     if not prefs:
-        prefs = DashboardPreferences(user_id=current_user.id)
+        prefs = DashboardPreferences()
         db.session.add(prefs)
         db.session.commit()
 
-    accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
-    recent_transactions = Transaction.query.filter_by(user_id=current_user.id).order_by(Transaction.date.desc()).limit(10).all()
+    accounts = Account.query.filter_by(is_active=True).all()
+    recent_transactions = Transaction.query.order_by(Transaction.date.desc()).limit(10).all()
 
     # Calculate total net worth
     total_assets = sum(acc.current_balance for acc in accounts if acc.account_type in ['checking', 'savings', 'cash'])

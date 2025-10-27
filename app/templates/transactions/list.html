@@ -16,6 +16,38 @@
     .bulk-action-bar.show {
         display: block;
     }
+
+    .quick-add-row {
+        background-color: #f0f8ff;
+        border-top: 2px solid #0066cc;
+        border-bottom: 2px solid #0066cc;
+    }
+
+    .quick-add-row input,
+    .quick-add-row select {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.6rem;
+    }
+
+    .quick-add-row td {
+        padding: 0.6rem !important;
+        vertical-align: middle;
+    }
+
+    .quick-add-btn {
+        white-space: nowrap;
+    }
+
+    .quick-add-error {
+        color: #dc3545;
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+
+    .quick-add-success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+    }
 </style>
 {% endblock %}
 
@@ -124,6 +156,50 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                <!-- Quick Add Row -->
+                                <tr class="quick-add-row" id="quickAddRow">
+                                    <td></td>
+                                    <td>
+                                        <input type="date" id="quickAddDate" class="form-control form-control-sm" required>
+                                        <div id="quickAddDateError" class="quick-add-error"></div>
+                                    </td>
+                                    <td>
+                                        <select id="quickAddAccount" class="form-select form-select-sm" required>
+                                            <option value="">Select account...</option>
+                                            {% for account in accounts %}
+                                                <option value="{{ account.id }}">{{ account.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <div id="quickAddAccountError" class="quick-add-error"></div>
+                                    </td>
+                                    <td>
+                                        <input type="text" id="quickAddPayee" class="form-control form-control-sm" placeholder="Payee">
+                                    </td>
+                                    <td>
+                                        <select id="quickAddCategory" class="form-select form-select-sm">
+                                            <option value="">No category</option>
+                                            {% for category in categories %}
+                                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" id="quickAddAmount" class="form-control form-control-sm" placeholder="Amount" step="0.01" required>
+                                        <div id="quickAddAmountError" class="quick-add-error"></div>
+                                    </td>
+                                    <td>
+                                        <select id="quickAddType" class="form-select form-select-sm">
+                                            <option value="expense">Expense</option>
+                                            <option value="deposit">Deposit</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <button id="quickAddBtn" class="btn btn-sm btn-success quick-add-btn" type="button">
+                                            <i class="fas fa-plus"></i> Add
+                                        </button>
+                                    </td>
+                                </tr>
+
                                 {% for transaction in transactions.items %}
                                     <tr>
                                         <td>
@@ -221,6 +297,114 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Quick-add functionality
+    const quickAddBtn = document.getElementById('quickAddBtn');
+    const quickAddDate = document.getElementById('quickAddDate');
+    const quickAddAccount = document.getElementById('quickAddAccount');
+    const quickAddPayee = document.getElementById('quickAddPayee');
+    const quickAddAmount = document.getElementById('quickAddAmount');
+    const quickAddType = document.getElementById('quickAddType');
+    const quickAddCategory = document.getElementById('quickAddCategory');
+
+    // Set today's date as default
+    const today = new Date().toISOString().split('T')[0];
+    quickAddDate.value = today;
+
+    function clearQuickAddErrors() {
+        document.getElementById('quickAddDateError').textContent = '';
+        document.getElementById('quickAddAccountError').textContent = '';
+        document.getElementById('quickAddAmountError').textContent = '';
+    }
+
+    function showQuickAddError(fieldId, message) {
+        document.getElementById(fieldId).textContent = message;
+    }
+
+    function validateQuickAdd() {
+        clearQuickAddErrors();
+        let isValid = true;
+
+        if (!quickAddDate.value) {
+            showQuickAddError('quickAddDateError', 'Date is required');
+            isValid = false;
+        }
+
+        if (!quickAddAccount.value) {
+            showQuickAddError('quickAddAccountError', 'Account is required');
+            isValid = false;
+        }
+
+        if (!quickAddAmount.value || parseFloat(quickAddAmount.value) <= 0) {
+            showQuickAddError('quickAddAmountError', 'Valid amount is required');
+            isValid = false;
+        }
+
+        return isValid;
+    }
+
+    quickAddBtn.addEventListener('click', function() {
+        if (!validateQuickAdd()) {
+            return;
+        }
+
+        const payload = {
+            date: quickAddDate.value,
+            amount: quickAddAmount.value,
+            payee: quickAddPayee.value,
+            account_id: quickAddAccount.value,
+            category_id: quickAddCategory.value || null,
+            transaction_type: quickAddType.value,
+            memo: ''
+        };
+
+        fetch('{{ url_for("transactions.quick_add_transaction") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Clear form
+                quickAddPayee.value = '';
+                quickAddAmount.value = '';
+                quickAddCategory.value = '';
+                quickAddDate.value = today;
+                clearQuickAddErrors();
+
+                // Show success feedback
+                const row = document.getElementById('quickAddRow');
+                row.classList.add('quick-add-success');
+                setTimeout(() => {
+                    row.classList.remove('quick-add-success');
+                }, 1000);
+
+                // Reload page to show new transaction
+                setTimeout(() => {
+                    location.reload();
+                }, 800);
+            } else {
+                alert('Error adding transaction: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error adding transaction: ' + error.message);
+        });
+    });
+
+    // Allow Enter key to submit quick add form
+    [quickAddDate, quickAddAccount, quickAddPayee, quickAddAmount, quickAddCategory].forEach(field => {
+        field.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                quickAddBtn.click();
+            }
+        });
+    });
+
+    // Bulk delete functionality
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
     const bulkActionBar = document.getElementById('bulkActionBar');

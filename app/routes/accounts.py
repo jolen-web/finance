@@ -9,7 +9,7 @@ bp = Blueprint('accounts', __name__, url_prefix='/accounts')
 @login_required
 def list_accounts():
     """List all accounts"""
-    accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
+    accounts = Account.query.filter_by(is_active=True).all()
     total_balance = sum(account.current_balance for account in accounts)
     return render_template('accounts/list.html', accounts=accounts, total_balance=total_balance)
 

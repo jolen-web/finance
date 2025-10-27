@@ -6,21 +6,29 @@ basedir = Path(__file__).parent.absolute()
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
 
-    # Database configuration
-    if os.environ.get('FLASK_ENV') == 'production':
+    # Per-user database configuration (dynamic routing)
+    # Database URI will be set per-request based on current_user
+    # Initialize with a default SQLite database for anonymous users
+    _base_db_path = os.path.join(os.path.dirname(__file__), 'data', 'finance_default.db')
+    SQLALCHEMY_DATABASE_URI = f'sqlite:///{_base_db_path}'
+
+    # Database configuration for dynamic routing
+    FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
+
+    if FLASK_ENV == 'production':
         # Cloud Run with Cloud SQL PostgreSQL
         # Connection via Unix socket: /cloudsql/PROJECT:REGION:INSTANCE
-        db_user = os.environ.get('DB_USER', 'postgres')
-        db_pass = os.environ.get('DB_PASSWORD', '')
-        db_name = os.environ.get('DB_NAME', 'finance')
-        cloud_sql_connection_name = os.environ.get('CLOUD_SQL_CONNECTION_NAME', 'jinolen:us-central1:finance-db')
+        DB_USER = os.environ.get('DB_USER', 'postgres')
+        DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
+        CLOUD_SQL_CONNECTION_NAME = os.environ.get('CLOUD_SQL_CONNECTION_NAME', 'jinolen:us-central1:finance-db')
 
-        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-            f'postgresql+psycopg2://{db_user}:{db_pass}@/{db_name}?host=/cloudsql/{cloud_sql_connection_name}'
-    else:
-        # Local development: use SQLite in data directory
-        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-            f'sqlite:///{basedir / "data" / "finance.db"}'
+    # Enable dynamic query tracking
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 3600,
+        'pool_size': 10,
+        'max_overflow': 20,
+    }
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 

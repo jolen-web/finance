@@ -80,7 +80,7 @@ def new_transaction():
         return redirect(url_for('transactions.list_transactions'))
 
     accounts = Account.query.filter_by(is_active=True).all()
-    categories = Category.query.filter_by(user_id=current_user.id).all()
+    categories = Category.query.all()
     return render_template('transactions/form.html',
                          transaction=None,
                          accounts=accounts,
@@ -118,7 +118,7 @@ def edit_transaction(id):
         return redirect(url_for('transactions.list_transactions'))
 
     accounts = Account.query.filter_by(is_active=True).all()
-    categories = Category.query.filter_by(user_id=current_user.id).all()
+    categories = Category.query.all()
     return render_template('transactions/form.html',
                          transaction=transaction,
                          accounts=accounts,
@@ -201,6 +201,84 @@ def bulk_delete():
             'deleted_count': len(transactions),
             'message': f'Successfully deleted {len(transactions)} transaction(s)'
         })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/quick-add', methods=['POST'])
+@login_required
+def quick_add_transaction():
+    """AJAX endpoint for quickly adding transaction from list view"""
+    try:
+        data = request.get_json()
+
+        # Extract and validate required fields
+        date_str = data.get('date')
+        amount = data.get('amount')
+        payee = data.get('payee', '')
+        account_id = data.get('account_id')
+        category_id = data.get('category_id')
+        transaction_type = data.get('transaction_type', 'expense')
+        memo = data.get('memo', '')
+
+        # Validate required fields
+        if not date_str or not amount or not account_id:
+            return jsonify({'error': 'Date, amount, and account are required'}), 400
+
+        # Parse and validate data
+        try:
+            transaction_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            amount_float = float(amount)
+        except ValueError:
+            return jsonify({'error': 'Invalid date or amount format'}), 400
+
+        # Verify account belongs to user
+        account = Account.query.get(account_id)
+        if not account or account.user_id != current_user.id:
+            return jsonify({'error': 'Account not found or access denied'}), 403
+
+        # Verify category belongs to user if provided
+        if category_id:
+            category = Category.query.get(category_id)
+            if not category or category.user_id != current_user.id:
+                return jsonify({'error': 'Category not found or access denied'}), 403
+
+        # Create transaction
+        transaction = Transaction(
+            date=transaction_date,
+            amount=amount_float,
+            payee=payee,
+            memo=memo,
+            transaction_type=transaction_type,
+            account_id=account_id,
+            category_id=int(category_id) if category_id else None,
+            user_id=current_user.id
+        )
+
+        db.session.add(transaction)
+
+        # Update account balance
+        account.update_balance()
+
+        db.session.commit()
+
+        # Return transaction data for client-side insertion
+        return jsonify({
+            'success': True,
+            'transaction': {
+                'id': transaction.id,
+                'date': transaction.date.strftime('%Y-%m-%d'),
+                'payee': transaction.payee or 'N/A',
+                'amount': f'{transaction.amount:.2f}',
+                'transaction_type': transaction.transaction_type,
+                'account_name': account.name,
+                'category_name': category.name if category_id else 'N/A',
+                'is_cleared': transaction.is_cleared,
+                'is_reconciled': transaction.is_reconciled
+            },
+            'message': f'Transaction added successfully!'
+        }), 201
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

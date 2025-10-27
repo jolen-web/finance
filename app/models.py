@@ -13,28 +13,6 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
 
-    # Relationships
-    accounts = db.relationship('Account', backref='user', lazy='dynamic',
-                               cascade='all, delete-orphan')
-    categories = db.relationship('Category', backref='user', lazy='dynamic',
-                                 cascade='all, delete-orphan')
-    transactions = db.relationship('Transaction', backref='user', lazy='dynamic',
-                                   cascade='all, delete-orphan')
-    receipts = db.relationship('Receipt', backref='user', lazy='dynamic',
-                               cascade='all, delete-orphan')
-    tax_tags = db.relationship('TaxTag', backref='user', lazy='dynamic',
-                               cascade='all, delete-orphan')
-    rules = db.relationship('CategorizationRule', backref='user', lazy='dynamic',
-                            cascade='all, delete-orphan')
-    insights = db.relationship('FinancialInsight', backref='user', lazy='dynamic',
-                               cascade='all, delete-orphan')
-    scenarios = db.relationship('Scenario', backref='user', lazy='dynamic',
-                                cascade='all, delete-orphan')
-    investments = db.relationship('Investment', backref='user', lazy='dynamic',
-                                  cascade='all, delete-orphan')
-    assets = db.relationship('Asset', backref='user', lazy='dynamic',
-                            cascade='all, delete-orphan')
-
     def __repr__(self):
         return f'<User {self.username}>'
 
@@ -57,9 +35,6 @@ class Account(db.Model):
     current_balance = db.Column(db.Float, default=0.0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
-
-    # Foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # Relationships
     transactions = db.relationship('Transaction', backref='account', lazy='dynamic',
@@ -103,9 +78,6 @@ class Category(db.Model):
     is_income = db.Column(db.Boolean, default=False)  # True for income categories
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-
     # Self-referential relationship for subcategories
     subcategories = db.relationship('Category', backref=db.backref('parent', remote_side=[id]))
 
@@ -130,7 +102,6 @@ class Transaction(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Foreign keys
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
 
@@ -155,9 +126,6 @@ class Receipt(db.Model):
     extracted_items = db.Column(db.Text, nullable=True)  # JSON string of line items
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-
     # Relationship
     transaction = db.relationship('Transaction', backref=db.backref('receipts', cascade='all, delete-orphan'))
 
@@ -176,9 +144,6 @@ class TaxTag(db.Model):
     deduction_percentage = db.Column(db.Float, default=100.0)  # For partial deductions
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # Foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # Relationship
     transaction = db.relationship('Transaction', backref='tax_tags')
@@ -199,9 +164,6 @@ class CategorizationRule(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_used_at = db.Column(db.DateTime, nullable=True)
 
-    # Foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-
     # Relationship
     category = db.relationship('Category', backref='categorization_rules')
 
@@ -221,9 +183,6 @@ class FinancialInsight(db.Model):
     amount_impact = db.Column(db.Float, nullable=True)  # Dollar amount relevant to insight
     is_dismissed = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # Foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # Relationship
     category = db.relationship('Category', backref='insights')
@@ -246,9 +205,6 @@ class Scenario(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-
     def __repr__(self):
         return f'<Scenario {self.name}>'
 
@@ -270,9 +226,6 @@ class Investment(db.Model):
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # Relationships
     category = db.relationship('InvestmentCategory', backref='investments')
@@ -323,9 +276,6 @@ class Asset(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-
     def __repr__(self):
         return f'<Asset {self.name}>'
 
@@ -346,7 +296,6 @@ class DashboardPreferences(db.Model):
     __tablename__ = 'dashboard_preferences'
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
     show_accounts = db.Column(db.Boolean, default=True)
     show_transactions = db.Column(db.Boolean, default=True)
     show_investments = db.Column(db.Boolean, default=True)
@@ -355,11 +304,8 @@ class DashboardPreferences(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationship
-    user = db.relationship('User', backref=db.backref('dashboard_preferences', uselist=False))
-
     def __repr__(self):
-        return f'<DashboardPreferences user_id={self.user_id}>'
+        return f'<DashboardPreferences>'
 
 
 class PayeeCategory(db.Model):
@@ -367,7 +313,6 @@ class PayeeCategory(db.Model):
     __tablename__ = 'payee_categories'
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     payee = db.Column(db.String(200), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
     frequency = db.Column(db.Integer, default=1)  # How many times this mapping was used

@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_user, logout_user, login_required, current_user
 from app.models import User
 from app import db
+from app.db_manager import db_manager
 from werkzeug.exceptions import BadRequest
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -54,6 +55,14 @@ def register():
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
+
+            # Create user's isolated database
+            if not db_manager.create_user_database(user.id):
+                # If database creation fails, rollback user creation
+                db.session.delete(user)
+                db.session.commit()
+                flash('Error creating user database. Please try again.', 'danger')
+                return render_template('auth/register.html')
 
             flash(f'Account created successfully! Welcome {username}. Please log in.', 'success')
             return redirect(url_for('auth.login'))

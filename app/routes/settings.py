@@ -187,9 +187,9 @@ def delete_category(id):
 @login_required
 def dashboard_preferences():
     """Manage dashboard display preferences"""
-    prefs = DashboardPreferences.query.filter_by(user_id=current_user.id).first()
+    prefs = DashboardPreferences.query.first()
     if not prefs:
-        prefs = DashboardPreferences(user_id=current_user.id)
+        prefs = DashboardPreferences()
         db.session.add(prefs)
         db.session.commit()
 
