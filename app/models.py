@@ -29,6 +29,7 @@ class Account(db.Model):
     __tablename__ = 'accounts'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     account_type = db.Column(db.String(20), nullable=False)  # checking, savings, credit_card, cash
     starting_balance = db.Column(db.Float, default=0.0)
@@ -37,6 +38,7 @@ class Account(db.Model):
     is_active = db.Column(db.Boolean, default=True)
 
     # Relationships
+    user = db.relationship('User', backref='accounts')
     transactions = db.relationship('Transaction', backref='account', lazy='dynamic',
                                    cascade='all, delete-orphan')
 
@@ -73,11 +75,14 @@ class Category(db.Model):
     __tablename__ = 'categories'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     parent_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
     is_income = db.Column(db.Boolean, default=False)  # True for income categories
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Relationships
+    user = db.relationship('User', backref='categories')
     # Self-referential relationship for subcategories
     subcategories = db.relationship('Category', backref=db.backref('parent', remote_side=[id]))
 
@@ -92,6 +97,7 @@ class Transaction(db.Model):
     __tablename__ = 'transactions'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     amount = db.Column(db.Float, nullable=False)
     payee = db.Column(db.String(200), nullable=True)
@@ -108,6 +114,9 @@ class Transaction(db.Model):
     # For transfers: link to the corresponding transaction in the other account
     transfer_to_transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id'), nullable=True)
 
+    # Relationship
+    user = db.relationship('User', backref='transactions')
+
     def __repr__(self):
         return f'<Transaction {self.payee} - ${self.amount}>'
 
@@ -116,6 +125,7 @@ class Receipt(db.Model):
     __tablename__ = 'receipts'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='CASCADE'), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
     filepath = db.Column(db.String(500), nullable=False)
@@ -127,6 +137,7 @@ class Receipt(db.Model):
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationship
+    user = db.relationship('User', backref='receipts')
     transaction = db.relationship('Transaction', backref=db.backref('receipts', cascade='all, delete-orphan'))
 
     def __repr__(self):
@@ -137,6 +148,7 @@ class TaxTag(db.Model):
     __tablename__ = 'tax_tags'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id'), nullable=False)
     tax_year = db.Column(db.Integer, nullable=False)
     is_deductible = db.Column(db.Boolean, default=True)
@@ -145,7 +157,8 @@ class TaxTag(db.Model):
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Relationship
+    # Relationships
+    user = db.relationship('User', backref='tax_tags')
     transaction = db.relationship('Transaction', backref='tax_tags')
 
     def __repr__(self):
@@ -156,6 +169,7 @@ class CategorizationRule(db.Model):
     __tablename__ = 'categorization_rules'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     payee_pattern = db.Column(db.String(200), nullable=False)  # Pattern to match payee
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
     confidence_score = db.Column(db.Float, default=1.0)  # ML confidence (0-1)
@@ -164,7 +178,8 @@ class CategorizationRule(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_used_at = db.Column(db.DateTime, nullable=True)
 
-    # Relationship
+    # Relationships
+    user = db.relationship('User', backref='categorization_rules')
     category = db.relationship('Category', backref='categorization_rules')
 
     def __repr__(self):
@@ -175,6 +190,7 @@ class FinancialInsight(db.Model):
     __tablename__ = 'financial_insights'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     insight_type = db.Column(db.String(50), nullable=False)  # spending_spike, savings_opportunity, subscription_alert, etc.
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
@@ -184,7 +200,8 @@ class FinancialInsight(db.Model):
     is_dismissed = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Relationship
+    # Relationships
+    user = db.relationship('User', backref='financial_insights')
     category = db.relationship('Category', backref='insights')
 
     def __repr__(self):
@@ -195,6 +212,7 @@ class Scenario(db.Model):
     __tablename__ = 'scenarios'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
     scenario_type = db.Column(db.String(50), nullable=False)  # income_change, expense_change, debt_payoff, savings_goal
@@ -205,6 +223,9 @@ class Scenario(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Relationship
+    user = db.relationship('User', backref='scenarios')
+
     def __repr__(self):
         return f'<Scenario {self.name}>'
 
@@ -213,6 +234,7 @@ class Investment(db.Model):
     __tablename__ = 'investments'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name = db.Column(db.String(200), nullable=False)
     ticker = db.Column(db.String(10), nullable=True)  # Stock ticker or investment code
     investment_type = db.Column(db.String(50), nullable=False)  # stock, bond, etf, mutual_fund, cryptocurrency, real_estate, other
@@ -228,6 +250,7 @@ class Investment(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    user = db.relationship('User', backref='investments')
     category = db.relationship('InvestmentCategory', backref='investments')
     account = db.relationship('Account', backref='investments')
 
@@ -254,19 +277,21 @@ class InvestmentCategory(db.Model):
     __tablename__ = 'investment_categories'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
     color = db.Column(db.String(7), default='#0066cc')  # Hex color for display
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def __repr__(self):
-        return f'<InvestmentCategory {self.name}>'
+    # Relationship
+    user = db.relationship('User', backref='investment_categories')
 
 
 class Asset(db.Model):
     __tablename__ = 'assets'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name = db.Column(db.String(200), nullable=False)  # e.g., "My House", "Toyota Camry", "Laptop"
     asset_type = db.Column(db.String(50), nullable=False)  # house, lot, vehicle, electronics, jewelry, art, collectible, other
     purchase_price = db.Column(db.Float, nullable=True)  # Original cost
@@ -275,6 +300,9 @@ class Asset(db.Model):
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationship
+    user = db.relationship('User', backref='assets')
 
     def __repr__(self):
         return f'<Asset {self.name}>'
@@ -296,6 +324,7 @@ class DashboardPreferences(db.Model):
     __tablename__ = 'dashboard_preferences'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     show_accounts = db.Column(db.Boolean, default=True)
     show_transactions = db.Column(db.Boolean, default=True)
     show_investments = db.Column(db.Boolean, default=True)
@@ -305,7 +334,7 @@ class DashboardPreferences(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self):
-        return f'<DashboardPreferences>'
+        return f'<DashboardPreferences(user_id={self.user_id})>'
 
 
 class PayeeCategory(db.Model):
@@ -313,6 +342,7 @@ class PayeeCategory(db.Model):
     __tablename__ = 'payee_categories'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     payee = db.Column(db.String(200), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
     frequency = db.Column(db.Integer, default=1)  # How many times this mapping was used
@@ -320,6 +350,7 @@ class PayeeCategory(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    user = db.relationship('User', backref='payee_categories')
     category = db.relationship('Category', backref='payee_mappings')
 
     def __repr__(self):

@@ -95,19 +95,33 @@
                 <div class="card-body">
                     <table class="table table-sm">
                         <thead>
+                            {% if items and items[0].get('price') is not none %}
                             <tr>
                                 <th>Item</th>
                                 <th>Qty</th>
                                 <th>Price</th>
                             </tr>
+                            {% elif items and items[0].get('description') is not none %}
+                            <tr>
+                                <th>Description</th>
+                                <th>Amount</th>
+                            </tr>
+                            {% endif %}
                         </thead>
                         <tbody>
                             {% for item in items %}
+                                {% if item.get('price') is not none %}
                                 <tr>
-                                    <td>{{ item.name }}</td>
-                                    <td>{{ item.quantity }}</td>
-                                    <td>{{ item.price|currency }}</td>
+                                    <td>{{ item.get('name', 'N/A') }}</td>
+                                    <td>{{ item.get('quantity', 'N/A') }}</td>
+                                    <td>{{ item.get('price')|currency }}</td>
                                 </tr>
+                                {% elif item.get('description') is not none %}
+                                <tr>
+                                    <td>{{ item.get('description', 'N/A') }}</td>
+                                    <td>{{ item.get('amount')|currency }}</td>
+                                </tr>
+                                {% endif %}
                             {% endfor %}
                         </tbody>
                     </table>

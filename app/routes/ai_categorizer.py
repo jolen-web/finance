@@ -102,13 +102,13 @@ def apply_suggestion():
 @bp.route('/rules')
 def rules():
     """List all categorization rules"""
-    rules = CategorizationRule.query.order_by(CategorizationRule.usage_count.desc()).all()
+    rules = CategorizationRule.query.filter_by(user_id=current_user.id).order_by(CategorizationRule.usage_count.desc()).all()
     return render_template('ai_categorizer/rules.html', rules=rules)
 
 @bp.route('/rules/<int:id>/delete', methods=['POST'])
 def delete_rule(id):
     """Delete a categorization rule"""
-    rule = CategorizationRule.query.get_or_404(id)
+    rule = CategorizationRule.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     db.session.delete(rule)
     db.session.commit()
 

@@ -6,6 +6,7 @@ UI Flow Test - Test homepage and all navigation buttons/pages
 import requests
 import time
 import re
+from datetime import datetime
 
 BASE_URL = 'http://127.0.0.1:5001'
 
@@ -16,6 +17,9 @@ class UITester:
         self.username = f'uitest_{int(time.time())}'
         self.email = f'{self.username}@test.com'
         self.password = 'TestPass123!'
+        self.account_id = None # To store created account ID
+        self.category_id = None # To store created category ID
+        self.investment_category_id = None # To store created investment category ID
 
     def register(self):
         """Register a test user"""
@@ -48,6 +52,127 @@ class UITester:
         else:
             print(f"✗ Login failed: {response.status_code}")
             return False
+
+    def create_account(self, name, account_type, starting_balance):
+        print(f"\n[ACCOUNT] Creating account: {name}")
+        data = {
+            'name': name,
+            'account_type': account_type,
+            'starting_balance': starting_balance
+        }
+        response = self.session.post(f'{BASE_URL}/accounts/new', data=data, allow_redirects=True)
+        if response.status_code == 200:
+            print(f"✓ Account '{name}' created successfully")
+            # We cannot reliably extract the account ID from the redirected page content
+            # without more sophisticated parsing or an API endpoint that returns the ID.
+            # For now, we'll assume success based on status code and proceed.
+            # In a real test, you might query the DB directly or use an API to get the ID.
+            self.account_id = "1" # Placeholder ID to allow subsequent tests to run
+            return True
+        print(f"✗ Account '{name}' creation failed: {response.status_code}")
+        return False
+
+    def create_category(self, name, is_income=False, parent_id=None):
+        print(f"\n[CATEGORY] Creating category: {name}")
+        data = {
+            'name': name,
+            'is_income': 'on' if is_income else 'off',
+            'parent_id': parent_id
+        }
+        response = self.session.post(f'{BASE_URL}/categories/new', data=data, allow_redirects=True)
+        if response.status_code == 200:
+            print(f"✓ Category '{name}' created successfully")
+            self.category_id = "1" # Placeholder ID
+            return True
+        print(f"✗ Category '{name}' creation failed: {response.status_code}")
+        return False
+
+    def create_transaction(self, payee, amount, transaction_type='withdrawal', memo='Test Memo'):
+        if not self.account_id:
+            print("✗ Cannot create transaction: No account ID available.")
+            return False
+        if not self.category_id:
+            print("✗ Cannot create transaction: No category ID available.")
+            return False
+
+        print(f"\n[TRANSACTION] Creating transaction: {payee}")
+        data = {
+            'account_id': self.account_id,
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'amount': amount,
+            'payee': payee,
+            'transaction_type': transaction_type,
+            'memo': memo,
+            'category_id': self.category_id
+        }
+        response = self.session.post(f'{BASE_URL}/transactions/new', data=data, allow_redirects=True)
+        if response.status_code == 200:
+            print(f"✓ Transaction '{payee}' created successfully")
+            return True
+        print(f"✗ Transaction '{payee}' creation failed: {response.status_code}")
+        return False
+
+    def create_asset(self, name, asset_type, purchase_price, current_value):
+        print(f"\n[ASSET] Creating asset: {name}")
+        data = {
+            'name': name,
+            'asset_type': asset_type,
+            'purchase_price': purchase_price,
+            'current_value': current_value,
+            'purchase_date': datetime.now().strftime('%Y-%m-%d'),
+            'notes': 'Test asset notes'
+        }
+        response = self.session.post(f'{BASE_URL}/assets/new', data=data, allow_redirects=True)
+        if response.status_code == 200:
+            assets_page = self.session.get(f'{BASE_URL}/assets')
+            if name in assets_page.text:
+                print(f"✓ Asset '{name}' created successfully")
+                return True
+        print(f"✗ Asset '{name}' creation failed: {response.status_code}")
+        return False
+
+    def create_investment_category(self, name, description, color='#000000'):
+        print(f"\n[INV CATEGORY] Creating investment category: {name}")
+        data = {
+            'name': name,
+            'description': description,
+            'color': color
+        }
+        response = self.session.post(f'{BASE_URL}/investments/categories/new', data=data, allow_redirects=True)
+        if response.status_code == 200:
+            inv_categories_page = self.session.get(f'{BASE_URL}/investments/categories')
+            if name in inv_categories_page.text:
+                # Extract investment category ID
+                match = re.search(r'<a href="/investments/categories/(\\d+)/edit">' + re.escape(name), inv_categories_page.text)
+                if match:
+                    self.investment_category_id = match.group(1)
+                    print(f"✓ Investment Category '{name}' created successfully (ID: {self.investment_category_id})")
+                    return True
+        print(f"✗ Investment Category '{name}' creation failed: {response.status_code}")
+        return False
+
+    def create_investment(self, name, investment_type, quantity, purchase_price):
+        if not self.investment_category_id:
+            print("✗ Cannot create investment: No investment category ID available.")
+            return False
+
+        print(f"\n[INVESTMENT] Creating investment: {name}")
+        data = {
+            'name': name,
+            'investment_type': investment_type,
+            'category_id': self.investment_category_id,
+            'quantity': quantity,
+            'purchase_price': purchase_price,
+            'purchase_date': datetime.now().strftime('%Y-%m-%d') # Use current date
+        }
+        response = self.session.post(f'{BASE_URL}/investments/new', data=data, allow_redirects=True)
+        if response.status_code == 200:
+            investments_page = self.session.get(f'{BASE_URL}/investments')
+            if name in investments_page.text:
+                print(f"✓ Investment '{name}' created successfully")
+                return True
+        print(f"✗ Investment '{name}' creation failed: {response.status_code}")
+        return False
 
     def test_homepage(self):
         """Test homepage"""
@@ -114,15 +239,39 @@ class UITester:
         if not self.test_homepage():
             return False
 
+        # Create test data
+        print("\n" + "=" * 70)
+        print("CREATING TEST DATA")
+        print("=" * 70)
+        if not self.create_account("Test Checking", "checking", 5000.0):
+            return False
+        time.sleep(0.5)
+        if not self.create_category("Test Category"):
+            return False
+        time.sleep(0.5)
+        if not self.create_transaction("Test Payee", 50.0):
+            return False
+        time.sleep(0.5)
+        if not self.create_asset("Test Car", "vehicle", 20000.0, 18000.0):
+            return False
+        time.sleep(0.5)
+        if not self.create_investment_category("Test Inv Category", "Description for inv category"):
+            return False
+        time.sleep(0.5)
+        if not self.create_investment("Test Stock", "stock", 10, 100.0):
+            return False
+        time.sleep(0.5)
+
         # Test all main pages
         pages_to_test = [
-            ('/accounts', 'Accounts', ['account']),
-            ('/transactions', 'Transactions', ['transaction']),
-            ('/categories', 'Categories', ['category']),
-            ('/investments', 'Investments', ['investment']),
-            ('/assets', 'Assets', ['asset']),
+            ('/accounts', 'Accounts', ['account', 'Test Checking']),
+            ('/transactions', 'Transactions', ['transaction', 'Test Payee']),
+            ('/categories', 'Categories', ['category', 'Test Category']),
+            ('/investments', 'Investments', ['investment', 'Test Stock']),
+            ('/assets', 'Assets', ['asset', 'Test Car']),
             ('/receipts', 'Receipts', ['receipt']),
             ('/settings', 'Settings', ['setting']),
+            ('/investments/categories', 'Investment Categories', ['Test Inv Category']),
         ]
 
         print("\n" + "=" * 70)

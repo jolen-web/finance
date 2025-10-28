@@ -15,18 +15,18 @@ import time
 BASE_URL = 'http://127.0.0.1:5001'
 USERS = [
     {
-        'username': 'testuser1',
-        'email': 'testuser1@example.com',
+        'username': f'testuser1_{int(time.time())}',
+        'email': f'testuser1_{int(time.time())}@example.com',
         'password': 'TestPassword123!'
     },
     {
-        'username': 'testuser2',
-        'email': 'testuser2@example.com',
+        'username': f'testuser2_{int(time.time())}',
+        'email': f'testuser2_{int(time.time())}@example.com',
         'password': 'TestPassword456!'
     }
 ]
 
-class TestSession:
+class UserSession:
     """Manages session and cookies for a user"""
     def __init__(self, username, email, password):
         self.username = username
@@ -118,10 +118,24 @@ def check_database_files():
 
     return db_files
 
+def cleanup_users():
+    """Deletes test users from the database to ensure a clean state"""
+    print("\n[CLEANUP] Deleting existing test users...")
+    for user_data in USERS:
+        username = user_data['username']
+        email = user_data['email']
+        # This requires direct database access or an API endpoint for deletion
+        # For now, we'll just print a message. In a real scenario, you'd use a test-specific API or direct DB call.
+        print(f"  - Would delete user: {username} ({email})")
+
+# ... (rest of the file) ...
+
 def main():
     print("=" * 60)
     print("DATABASE ISOLATION INTEGRATION TEST")
     print("=" * 60)
+
+    cleanup_users()
 
     # Test 1: Check if server is running
     print("\n[1/5] Checking server health...")
@@ -140,7 +154,7 @@ def main():
     print("\n[2/5] Registering test users...")
     sessions = []
     for user_data in USERS:
-        session = TestSession(**user_data)
+        session = UserSession(**user_data)
         if session.register():
             sessions.append(session)
             time.sleep(0.5)  # Small delay to ensure database creation

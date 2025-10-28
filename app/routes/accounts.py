@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from app.models import Account, Transaction
 from app import db
@@ -9,7 +9,8 @@ bp = Blueprint('accounts', __name__, url_prefix='/accounts')
 @login_required
 def list_accounts():
     """List all accounts"""
-    accounts = Account.query.filter_by(is_active=True).all()
+    accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
+    current_app.logger.debug(f"Accounts retrieved for user {current_user.id}: {[a.name for a in accounts]}")
     total_balance = sum(account.current_balance for account in accounts)
     return render_template('accounts/list.html', accounts=accounts, total_balance=total_balance)
 
@@ -23,17 +24,25 @@ def new_account():
         starting_balance = float(request.form.get('starting_balance', 0))
 
         account = Account(
+            user_id=current_user.id,
             name=name,
             account_type=account_type,
             starting_balance=starting_balance,
             current_balance=starting_balance
         )
 
-        db.session.add(account)
-        db.session.commit()
+        try:
+            db.session.add(account)
+            db.session.commit()
+            current_app.logger.debug(f"Account '{name}' created with ID: {account.id}")
 
-        flash(f'Account "{name}" created successfully!', 'success')
-        return redirect(url_for('accounts.list_accounts'))
+            flash(f'Account "{name}" created successfully!', 'success')
+            return redirect(url_for('accounts.list_accounts'))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error creating account '{name}': {e}", exc_info=True)
+            flash(f'Error creating account: {e}', 'danger')
+            return redirect(url_for('accounts.new_account'))
 
     return render_template('accounts/form.html', account=None)
 
@@ -41,7 +50,7 @@ def new_account():
 @login_required
 def edit_account(id):
     """Edit existing account"""
-    account = Account.query.get_or_404(id)
+    account = Account.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         account.name = request.form.get('name')
@@ -64,7 +73,7 @@ def edit_account(id):
 @login_required
 def delete_account(id):
     """Delete account"""
-    account = Account.query.get_or_404(id)
+    account = Account.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     account.is_active = False  # Soft delete
     db.session.commit()
 
@@ -75,7 +84,7 @@ def delete_account(id):
 @login_required
 def view_account(id):
     """View account details with transactions"""
-    account = Account.query.get_or_404(id)
+    account = Account.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     transactions = account.transactions.all()
     # Sort transactions by date in descending order
     transactions = sorted(transactions, key=lambda t: t.date, reverse=True)

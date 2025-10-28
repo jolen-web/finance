@@ -25,39 +25,6 @@ def create_app(config_class=Config):
         from app.models import User
         return User.query.get(int(user_id))
 
-    # Dynamic database routing middleware
-    @app.before_request
-    def set_user_database():
-        """Set the database URI based on current user for per-user isolation"""
-        if current_user.is_authenticated:
-            from app.db_manager import db_manager
-            from sqlalchemy import create_engine
-            from sqlalchemy.pool import StaticPool
-
-            # Get user-specific database URI
-            db_uri = db_manager.get_database_uri(current_user.id)
-
-            # Update the app config (this is what gets read by db.get_engine())
-            app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
-
-            # Get or create engine for this user's database
-            if not hasattr(app, '_user_engines'):
-                app._user_engines = {}
-
-            if current_user.id not in app._user_engines:
-                # Create a new engine for this user's database
-                engine_options = app.config['SQLALCHEMY_ENGINE_OPTIONS'].copy()
-                if db_uri.startswith('sqlite://'):
-                    # SQLite doesn't support pool_size and max_overflow with StaticPool
-                    engine_options.pop('pool_size', None)
-                    engine_options.pop('max_overflow', None)
-                    engine_options['poolclass'] = StaticPool
-
-                app._user_engines[current_user.id] = create_engine(db_uri, **engine_options)
-
-            # Bind the session to this user's engine
-            db.session.bind = app._user_engines[current_user.id]
-
     # Register blueprints
     from app.routes import main, accounts, transactions, categories, backup, backup_view, settings, receipts, ai_categorizer, financial_advisor, tax_assistant, scenario_planner, investments, auth, assets
     app.register_blueprint(main.bp)
@@ -117,15 +84,19 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_dashboard_prefs():
         """Inject dashboard preferences into template context for all pages"""
-        if current_user.is_authenticated:
-            from app.models import DashboardPreferences
-            prefs = DashboardPreferences.query.first()
-            if not prefs:
-                # Create default preferences if they don't exist
-                prefs = DashboardPreferences()
-                db.session.add(prefs)
-                db.session.commit()
-            return {'prefs': prefs}
+        try:
+            if current_user.is_authenticated and current_user.id:
+                from app.models import DashboardPreferences
+                prefs = DashboardPreferences.query.filter_by(user_id=current_user.id).first()
+                if not prefs:
+                    # Create default preferences if they don't exist
+                    prefs = DashboardPreferences(user_id=current_user.id)
+                    db.session.add(prefs)
+                    db.session.commit()
+                return {'prefs': prefs}
+        except Exception as e:
+            import logging
+            logging.error(f"Error in inject_dashboard_prefs: {e}")
         return {'prefs': None}
 
     return app

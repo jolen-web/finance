@@ -1,4 +1,14 @@
 
+# Python
+__pycache__/
+*.pyc
+
+# Database
+data/*.db
+
+# Temporary receipt files
+data/receipts/temp/
+
 # cc-sessions runtime files
 sessions/sessions-state.json
 sessions/package.json

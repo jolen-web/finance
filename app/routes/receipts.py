@@ -12,13 +12,16 @@ from datetime import datetime
 bp = Blueprint('receipts', __name__, url_prefix='/receipts')
 
 @bp.route('/')
+@login_required
 def index():
     """Receipt management dashboard"""
     agent = ReceiptOCRAgent()
-    stats = agent.get_receipt_stats()
+    stats = agent.get_receipt_stats(current_user.id)
 
-    # Get recent receipts
-    recent_receipts = Receipt.query.order_by(Receipt.uploaded_at.desc()).limit(20).all()
+    # Get recent receipts for current user only
+    recent_receipts = Receipt.query.join(Transaction).filter(
+        Transaction.user_id == current_user.id
+    ).order_by(Receipt.uploaded_at.desc()).limit(20).all()
 
     return render_template('receipts/index.html',
                          stats=stats,
@@ -47,7 +50,7 @@ def upload(transaction_id):
             return redirect(request.url)
 
         # Process receipt
-        receipt, parsed_data = agent.process_receipt(file, transaction_id)
+        receipt, parsed_data = agent.process_receipt(current_user.id, file, transaction_id)
 
         if not receipt:
             flash(f'Error processing receipt: {parsed_data}', 'danger')
@@ -115,6 +118,10 @@ def bulk_import():
 
         account = Account.query.get_or_404(account_id)
 
+        # Verify user owns this account
+        if account.user_id != current_user.id:
+            return jsonify({'error': 'Access denied'}), 403
+
         imported_count = 0
         for trans_data in transactions_data:
             # Validate required fields
@@ -152,6 +159,7 @@ def bulk_import():
 
                 # Create transaction
                 transaction = Transaction(
+                    user_id=current_user.id,
                     account_id=account_id,
                     date=trans_date,
                     payee=trans_data.get('description', 'Unknown'),
@@ -171,6 +179,58 @@ def bulk_import():
         account.update_balance()
 
         db.session.commit()
+
+        # Create receipt record if we have pending receipt data (from session or request)
+        receipt_data = None
+        if 'pending_receipt' in session:
+            receipt_data = session.get('pending_receipt')
+        elif import_data and 'receipt_metadata' in import_data:
+            receipt_data = import_data.get('receipt_metadata')
+
+        if imported_count > 0 and receipt_data:
+            try:
+                agent = ReceiptOCRAgent()
+
+                current_app.logger.info(f"Creating receipt record for {imported_count} imported transactions")
+                current_app.logger.debug(f"Receipt data: {receipt_data}")
+
+                # Get the first imported transaction to link to
+                # (In bulk import, all transactions come from the same receipt)
+                first_transaction = Transaction.query.filter_by(
+                    account_id=account_id,
+                    user_id=current_user.id
+                ).order_by(Transaction.id.desc()).first()
+
+                if first_transaction:
+                    # Create receipt record linking to the first transaction
+                    receipt = agent.create_receipt_record(
+                        user_id=current_user.id,
+                        filepath=receipt_data.get('filepath'),
+                        filename=receipt_data.get('filename'),
+                        transaction_id=first_transaction.id,
+                        parsed_data={
+                            'merchant': receipt_data.get('merchant', 'Bank Statement'),
+                            'date': first_transaction.date,
+                            'items': [
+                                {
+                                    'description': t.get('description', 'Unknown'),
+                                    'amount': t.get('amount', 0.0),
+                                    'date': t.get('date', '')
+                                }
+                                for t in transactions_data if t.get('description')
+                            ]
+                        },
+                        file_type=receipt_data.get('file_type')
+                    )
+
+                    current_app.logger.info(f"✓ Created receipt record ID {receipt.id} for transaction ID {first_transaction.id}")
+
+                    # Clear session data if it exists
+                    session.pop('pending_receipt', None)
+                else:
+                    current_app.logger.warning(f"No transaction found to link receipt to for account {account_id}")
+            except Exception as e:
+                current_app.logger.error(f"Failed to create receipt record for bulk import: {str(e)}", exc_info=True)
 
         # Save category mappings for future use
         if imported_count > 0:
@@ -207,6 +267,7 @@ def bulk_import():
             return redirect(request.referrer or url_for('receipts.index'))
 
 @bp.route('/upload-new', methods=['GET', 'POST'])
+@login_required
 def upload_new():
     """Upload receipt and create new transaction"""
     if request.method == 'POST':
@@ -291,7 +352,7 @@ def upload_new():
             'transaction_count': len(line_items)
         })
 
-    accounts = Account.query.filter_by(is_active=True).all()
+    accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
     currency_info = get_currency_info()
     return render_template('receipts/upload_new.html',
                          accounts=accounts,
@@ -317,8 +378,14 @@ def confirm_receipt():
         return jsonify({'error': 'Missing required fields'}), 400
 
     try:
+        # Verify user owns the account
+        account = Account.query.get_or_404(account_id)
+        if account.user_id != current_user.id:
+            return jsonify({'error': 'Access denied'}), 403
+
         # Create transaction with reviewed data
         transaction = Transaction(
+            user_id=current_user.id,
             date=datetime.strptime(transaction_date, '%Y-%m-%d').date() if isinstance(transaction_date, str) else transaction_date,
             amount=float(amount),
             payee=merchant,
@@ -337,6 +404,7 @@ def confirm_receipt():
 
             # Create receipt record linking to the new transaction
             agent.create_receipt_record(
+                user_id=current_user.id,
                 filepath=receipt_data['filepath'],
                 filename=receipt_data['filename'],
                 transaction_id=transaction.id,
@@ -348,10 +416,8 @@ def confirm_receipt():
             session.pop('pending_receipt', None)
 
         # Update account balance
-        account = Account.query.get(account_id)
-        if account:
-            account.update_balance()
-            db.session.commit()
+        account.update_balance()
+        db.session.commit()
 
         return jsonify({
             'success': True,
@@ -369,9 +435,15 @@ def camera_capture(transaction_id):
     return render_template('receipts/camera.html', transaction=transaction)
 
 @bp.route('/view/<int:receipt_id>')
+@login_required
 def view(receipt_id):
     """View receipt details"""
     receipt = Receipt.query.get_or_404(receipt_id)
+
+    # Verify user owns this receipt
+    if receipt.transaction.user_id != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('receipts.index'))
 
     # Parse items if available
     items = []
@@ -384,9 +456,15 @@ def view(receipt_id):
     return render_template('receipts/view.html', receipt=receipt, items=items)
 
 @bp.route('/image/<int:receipt_id>')
+@login_required
 def serve_image(receipt_id):
     """Serve receipt image"""
     receipt = Receipt.query.get_or_404(receipt_id)
+
+    # Verify user owns this receipt
+    if receipt.transaction.user_id != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('receipts.index'))
 
     import os
     if os.path.exists(receipt.filepath):
@@ -396,8 +474,16 @@ def serve_image(receipt_id):
         return redirect(url_for('receipts.index'))
 
 @bp.route('/delete/<int:receipt_id>', methods=['POST'])
+@login_required
 def delete(receipt_id):
     """Delete receipt"""
+    receipt = Receipt.query.get_or_404(receipt_id)
+
+    # Verify user owns this receipt
+    if receipt.transaction.user_id != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('receipts.index'))
+
     agent = ReceiptOCRAgent()
     success, message = agent.delete_receipt(receipt_id)
 
@@ -409,9 +495,10 @@ def delete(receipt_id):
     return redirect(request.referrer or url_for('receipts.index'))
 
 @bp.route('/api/categories', methods=['GET'])
+@login_required
 def get_categories():
-    """API endpoint to get all available categories"""
-    categories = Category.query.filter_by(is_income=False).all()
+    """API endpoint to get available categories for current user"""
+    categories = Category.query.filter_by(user_id=current_user.id, is_income=False).all()
     return jsonify({
         'categories': [
             {'id': cat.id, 'name': cat.name}
@@ -478,6 +565,7 @@ def suggest_categories():
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/api/upload', methods=['POST'])
+@login_required
 def api_upload():
     """API endpoint for camera/mobile upload"""
     if 'receipt_image' not in request.files:
@@ -488,6 +576,11 @@ def api_upload():
 
     if not transaction_id:
         return jsonify({'error': 'Transaction ID required'}), 400
+
+    # Verify user owns this transaction
+    transaction = Transaction.query.get(int(transaction_id))
+    if not transaction or transaction.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
 
     agent = ReceiptOCRAgent()
     receipt, parsed_data = agent.process_receipt(file, int(transaction_id))
@@ -507,9 +600,16 @@ def api_upload():
     })
 
 @bp.route('/match/<int:receipt_id>')
+@login_required
 def auto_match(receipt_id):
     """Try to auto-match receipt to existing transaction"""
     receipt = Receipt.query.get_or_404(receipt_id)
+
+    # Verify user owns this receipt
+    if receipt.transaction.user_id != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('receipts.index'))
+
     agent = ReceiptOCRAgent()
 
     # Get parsed data

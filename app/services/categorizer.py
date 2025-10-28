@@ -24,7 +24,8 @@ class TransactionCategorizer:
 
         # Step 1: Check cache for existing payee mapping
         cached = PayeeCategory.query.filter_by(
-            payee=payee
+            payee=payee,
+            user_id=self.user_id
         ).first()
 
         if cached:
@@ -44,7 +45,7 @@ class TransactionCategorizer:
         """Use Gemini to suggest the best category for a transaction"""
         try:
             # Get available categories for this user
-            categories = Category.query.all()
+            categories = Category.query.filter_by(user_id=self.user_id).all()
             category_names = [cat.name for cat in categories]
 
             if not category_names:
@@ -123,7 +124,8 @@ Be strict - only use categories from the provided list."""
             # Check if already exists
             existing = PayeeCategory.query.filter_by(
                 payee=payee,
-                category_id=category_id
+                category_id=category_id,
+                user_id=self.user_id
             ).first()
 
             if existing:
@@ -133,6 +135,7 @@ Be strict - only use categories from the provided list."""
             else:
                 # Create new mapping
                 mapping = PayeeCategory(
+                    user_id=self.user_id,
                     payee=payee,
                     category_id=category_id
                 )
@@ -149,7 +152,8 @@ Be strict - only use categories from the provided list."""
         try:
             # Find or create
             mapping = PayeeCategory.query.filter_by(
-                payee=payee
+                payee=payee,
+                user_id=self.user_id
             ).first()
 
             if mapping:
@@ -157,6 +161,7 @@ Be strict - only use categories from the provided list."""
                 mapping.frequency += 1
             else:
                 mapping = PayeeCategory(
+                    user_id=self.user_id,
                     payee=payee,
                     category_id=category_id
                 )
@@ -172,8 +177,10 @@ Be strict - only use categories from the provided list."""
 
     def get_cache_stats(self):
         """Get statistics about cached payee mappings"""
-        total = PayeeCategory.query.count()
-        most_used = PayeeCategory.query.order_by(
+        total = PayeeCategory.query.filter_by(user_id=self.user_id).count()
+        most_used = PayeeCategory.query.filter_by(
+            user_id=self.user_id
+        ).order_by(
             PayeeCategory.frequency.desc()
         ).limit(10).all()
 

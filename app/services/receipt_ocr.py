@@ -650,7 +650,8 @@ CRITICAL RULES:
         lines = ocr_text.split('\n')
 
         # First, check if this looks like a statement with multiple transactions
-        statement_transactions = self.parse_statement_data(ocr_text)
+        statement_data = self.parse_statement_data(ocr_text)
+        statement_transactions = statement_data.get('line_items', [])
         if len(statement_transactions) > 2:  # If we found multiple transactions, treat as statement
             data['line_items'] = statement_transactions
             return data
@@ -793,10 +794,11 @@ CRITICAL RULES:
 
         return filepath, filename_or_error, parsed_data, file_type
 
-    def create_receipt_record(self, filepath, filename, transaction_id, parsed_data, file_type):
+    def create_receipt_record(self, user_id, filepath, filename, transaction_id, parsed_data, file_type):
         """Create Receipt database record after transaction is confirmed
 
         Args:
+            user_id: The ID of the user
             filepath: Path to saved receipt file
             filename: Original filename
             transaction_id: Transaction ID to link to
@@ -807,6 +809,7 @@ CRITICAL RULES:
             Receipt object
         """
         receipt = Receipt(
+            user_id=user_id,
             transaction_id=transaction_id,
             filename=filename,
             filepath=filepath,
@@ -822,10 +825,11 @@ CRITICAL RULES:
 
         return receipt
 
-    def process_receipt(self, file, transaction_id, password=None):
+    def process_receipt(self, user_id, file, transaction_id, password=None):
         """Process uploaded receipt: save, OCR, and parse
 
         Args:
+            user_id: The ID of the user uploading the receipt.
             file: Uploaded file object
             transaction_id: Transaction ID to associate receipt with
             password: Optional password for encrypted PDFs
@@ -870,15 +874,24 @@ CRITICAL RULES:
             # Parse receipt data using regex patterns
             parsed_data = self.parse_receipt_data(ocr_text)
 
+        # Determine the extracted amount
+        extracted_amount = parsed_data.get('amount')
+        if extracted_amount is None and parsed_data.get('line_items'):
+            # If no top-level amount, sum from line items
+            extracted_amount = sum(abs(item.get('amount', 0)) for item in parsed_data['line_items'])
+
+        current_app.logger.debug(f"Calculated extracted_amount: {extracted_amount}")
+
         # Create receipt record
         receipt = Receipt(
+            user_id=user_id,
             transaction_id=transaction_id,
             filename=filename_or_error,
             filepath=filepath,
             file_type=file.content_type or 'image/jpeg',
             extracted_merchant=parsed_data.get('merchant'),
             extracted_date=parsed_data.get('date'),
-            extracted_amount=parsed_data.get('amount'),
+            extracted_amount=extracted_amount,
             extracted_items=json.dumps(parsed_data.get('items', [])) if parsed_data.get('items') else None
         )
 
@@ -969,12 +982,12 @@ CRITICAL RULES:
 
         return True, "Receipt deleted successfully"
 
-    def get_receipt_stats(self):
-        """Get receipt statistics"""
-        total_receipts = Receipt.query.count()
-        receipts_with_amount = Receipt.query.filter(Receipt.extracted_amount.isnot(None)).count()
-        receipts_with_date = Receipt.query.filter(Receipt.extracted_date.isnot(None)).count()
-        receipts_with_merchant = Receipt.query.filter(Receipt.extracted_merchant.isnot(None)).count()
+    def get_receipt_stats(self, user_id):
+        """Get receipt statistics for a specific user"""
+        total_receipts = Receipt.query.filter_by(user_id=user_id).count()
+        receipts_with_amount = Receipt.query.filter_by(user_id=user_id).filter(Receipt.extracted_amount.isnot(None)).count()
+        receipts_with_date = Receipt.query.filter_by(user_id=user_id).filter(Receipt.extracted_date.isnot(None)).count()
+        receipts_with_merchant = Receipt.query.filter_by(user_id=user_id).filter(Receipt.extracted_merchant.isnot(None)).count()
 
         return {
             'total': total_receipts,

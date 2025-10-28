@@ -17,7 +17,7 @@ def list_transactions():
     end_date = request.args.get('end_date')
     search = request.args.get('search', '')
 
-    query = Transaction.query
+    query = Transaction.query.filter_by(user_id=current_user.id)
 
     # Apply filters
     if account_id:
@@ -34,8 +34,8 @@ def list_transactions():
     transactions = query.order_by(Transaction.date.desc()).paginate(
         page=page, per_page=50, error_out=False)
 
-    accounts = Account.query.filter_by(is_active=True).all()
-    categories = Category.query.all()
+    accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
+    categories = Category.query.filter_by(user_id=current_user.id).all()
 
     return render_template('transactions/list.html',
                          transactions=transactions,
@@ -56,30 +56,38 @@ def new_transaction():
         category_id = request.form.get('category_id')
         category_id = int(category_id) if category_id else None
 
-        transaction = Transaction(
-            date=datetime.strptime(date_str, '%Y-%m-%d').date(),
-            amount=amount,
-            payee=payee,
-            memo=memo,
-            transaction_type=transaction_type,
-            account_id=account_id,
-            category_id=category_id
-        )
+        try:
+            transaction = Transaction(
+                user_id=current_user.id,
+                date=datetime.strptime(date_str, '%Y-%m-%d').date(),
+                amount=amount,
+                payee=payee,
+                memo=memo,
+                transaction_type=transaction_type,
+                account_id=account_id,
+                category_id=category_id
+            )
 
-        db.session.add(transaction)
+            db.session.add(transaction)
 
-        # Update account balance
-        account = Account.query.get(account_id)
-        account.update_balance()
+            # Update account balance
+            account = Account.query.filter_by(id=account_id, user_id=current_user.id).first_or_404()
+            account.update_balance()
 
-        db.session.commit()
+            db.session.commit()
 
-        payee_display = payee if payee else 'Transaction'
-        flash(f'{payee_display} added successfully!', 'success')
-        return redirect(url_for('transactions.list_transactions'))
+            payee_display = payee if payee else 'Transaction'
+            flash(f'{payee_display} added successfully!', 'success')
+            return redirect(url_for('transactions.list_transactions'))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error creating transaction: {e}", exc_info=True)
+            flash(f'Error creating transaction: {e}', 'danger')
+            # Redirect to the form page or a generic error page
+            return redirect(url_for('transactions.new_transaction'))
 
-    accounts = Account.query.filter_by(is_active=True).all()
-    categories = Category.query.all()
+    accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
+    categories = Category.query.filter_by(user_id=current_user.id).all()
     return render_template('transactions/form.html',
                          transaction=None,
                          accounts=accounts,
@@ -89,7 +97,7 @@ def new_transaction():
 @login_required
 def edit_transaction(id):
     """Edit existing transaction"""
-    transaction = Transaction.query.get_or_404(id)
+    transaction = Transaction.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         date_str = request.form.get('date')
@@ -105,10 +113,10 @@ def edit_transaction(id):
 
         # Update balances for affected accounts
         if old_account_id != transaction.account_id:
-            old_account = Account.query.get(old_account_id)
+            old_account = Account.query.filter_by(id=old_account_id, user_id=current_user.id).first_or_404()
             old_account.update_balance()
 
-        account = Account.query.get(transaction.account_id)
+        account = Account.query.filter_by(id=transaction.account_id, user_id=current_user.id).first_or_404()
         account.update_balance()
 
         db.session.commit()
@@ -116,8 +124,8 @@ def edit_transaction(id):
         flash(f'Transaction updated successfully!', 'success')
         return redirect(url_for('transactions.list_transactions'))
 
-    accounts = Account.query.filter_by(is_active=True).all()
-    categories = Category.query.all()
+    accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
+    categories = Category.query.filter_by(user_id=current_user.id).all()
     return render_template('transactions/form.html',
                          transaction=transaction,
                          accounts=accounts,
@@ -127,7 +135,7 @@ def edit_transaction(id):
 @login_required
 def delete_transaction(id):
     """Delete transaction"""
-    transaction = Transaction.query.get_or_404(id)
+    transaction = Transaction.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     account = transaction.account
 
     db.session.delete(transaction)
@@ -144,7 +152,7 @@ def delete_transaction(id):
 @login_required
 def toggle_cleared(id):
     """Toggle transaction cleared status"""
-    transaction = Transaction.query.get_or_404(id)
+    transaction = Transaction.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     transaction.is_cleared = not transaction.is_cleared
     db.session.commit()
 
@@ -154,7 +162,7 @@ def toggle_cleared(id):
 @login_required
 def toggle_reconciled(id):
     """Toggle transaction reconciled status"""
-    transaction = Transaction.query.get_or_404(id)
+    transaction = Transaction.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     transaction.is_reconciled = not transaction.is_reconciled
     if transaction.is_reconciled:
         transaction.is_cleared = True  # Reconciled implies cleared
@@ -173,8 +181,11 @@ def bulk_delete():
         if not transaction_ids:
             return jsonify({'error': 'No transactions selected'}), 400
 
-        # Get all transactions to be deleted
-        transactions = Transaction.query.filter(Transaction.id.in_(transaction_ids)).all()
+        # Get all transactions to be deleted (only user's own transactions)
+        transactions = Transaction.query.filter(
+            Transaction.id.in_(transaction_ids),
+            Transaction.user_id == current_user.id
+        ).all()
 
         if not transactions:
             return jsonify({'error': 'No transactions found'}), 404
@@ -231,19 +242,21 @@ def quick_add_transaction():
         except ValueError:
             return jsonify({'error': 'Invalid date or amount format'}), 400
 
-        # Verify account exists
-        account = Account.query.get(account_id)
+        # Verify account exists and belongs to user
+        account = Account.query.filter_by(id=account_id, user_id=current_user.id).first()
         if not account:
             return jsonify({'error': 'Account not found'}), 404
 
-        # Verify category exists if provided
+        # Verify category exists and belongs to user if provided
+        category = None
         if category_id:
-            category = Category.query.get(category_id)
+            category = Category.query.filter_by(id=category_id, user_id=current_user.id).first()
             if not category:
                 return jsonify({'error': 'Category not found'}), 404
 
         # Create transaction
         transaction = Transaction(
+            user_id=current_user.id,
             date=transaction_date,
             amount=amount_float,
             payee=payee,

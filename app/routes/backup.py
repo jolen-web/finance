@@ -12,9 +12,9 @@ bp = Blueprint('backup', __name__, url_prefix='/backup')
 def export_data():
     """Export all data to JSON file"""
     # Gather all data
-    accounts = Account.query.all()
-    transactions = Transaction.query.all()
-    categories = Category.query.all()
+    accounts = Account.query.filter_by(user_id=current_user.id).all()
+    transactions = Transaction.query.filter_by(user_id=current_user.id).all()
+    categories = Category.query.filter_by(user_id=current_user.id).all()
 
     data = {
         'export_date': datetime.utcnow().isoformat(),
@@ -83,8 +83,8 @@ def import_data():
 
         # Clear existing data (optional - could add option to merge instead)
         if request.form.get('clear_existing') == 'yes':
-            Transaction.query.delete()
-            Account.query.delete()
+            Transaction.query.filter_by(user_id=current_user.id).delete()
+            Account.query.filter_by(user_id=current_user.id).delete()
             # Don't delete categories as they might be default ones
 
         # Import accounts
@@ -92,6 +92,7 @@ def import_data():
         for acc_data in data.get('accounts', []):
             old_id = acc_data['id']
             acc = Account(
+                user_id=current_user.id,
                 name=acc_data['name'],
                 account_type=acc_data['account_type'],
                 starting_balance=acc_data['starting_balance'],
@@ -106,11 +107,12 @@ def import_data():
         category_id_map = {}
         for cat_data in data.get('categories', []):
             old_id = cat_data['id']
-            existing = Category.query.filter_by(name=cat_data['name']).first()
+            existing = Category.query.filter_by(name=cat_data['name'], user_id=current_user.id).first()
             if existing:
                 category_id_map[old_id] = existing.id
             else:
                 cat = Category(
+                    user_id=current_user.id,
                     name=cat_data['name'],
                     parent_id=cat_data.get('parent_id'),
                     is_income=cat_data.get('is_income', False)
@@ -122,6 +124,7 @@ def import_data():
         # Import transactions
         for trans_data in data.get('transactions', []):
             trans = Transaction(
+                user_id=current_user.id,
                 date=datetime.fromisoformat(trans_data['date']).date(),
                 amount=trans_data['amount'],
                 payee=trans_data['payee'],

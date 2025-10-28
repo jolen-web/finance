@@ -1,26 +1,26 @@
 import os
 from pathlib import Path
+from app.db_manager import db_manager
 
 basedir = Path(__file__).parent.absolute()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
 
-    # Per-user database configuration (dynamic routing)
-    # Database URI will be set per-request based on current_user
-    # Initialize with a default SQLite database for anonymous users
-    _base_db_path = os.path.join(os.path.dirname(__file__), 'data', 'finance_default.db')
-    SQLALCHEMY_DATABASE_URI = f'sqlite:///{_base_db_path}'
-
-    # Database configuration for dynamic routing
+    # Database configuration
     FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
 
-    if FLASK_ENV == 'production':
-        # Cloud Run with Cloud SQL PostgreSQL
-        # Connection via Unix socket: /cloudsql/PROJECT:REGION:INSTANCE
-        DB_USER = os.environ.get('DB_USER', 'postgres')
-        DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
-        CLOUD_SQL_CONNECTION_NAME = os.environ.get('CLOUD_SQL_CONNECTION_NAME', 'jinolen:us-central1:finance-db')
+    if FLASK_ENV == 'development':
+        # For development, use a default SQLite database for operations
+        # outside of a request context (e.g., flask db migrate).
+        # The per-user database will be switched in app/__init__.py for requests.
+        db_path = basedir / 'data' / 'finance.db'
+        SQLALCHEMY_DATABASE_URI = f'sqlite:///{db_path}'
+    else:
+        # In production, the URI is set dynamically per-request.
+        # We set a dummy value here to avoid import-time errors.
+        # CLI commands that need the DB in production will require a different setup.
+        SQLALCHEMY_DATABASE_URI = 'postgresql://dummy:dummy@dummy/dummy'
 
     # Enable dynamic query tracking
     SQLALCHEMY_ENGINE_OPTIONS = {

@@ -47,7 +47,7 @@
                 </h3>
                 {% if total_invested > 0 %}
                     <small class="text-muted">
-                        {{ "{:.1f}"|format((total_gain_loss / total_invested) * 100) }}%
+                        {{ ((total_gain_loss / total_invested) * 100) | round(1) }}%
                     </small>
                 {% endif %}
             </div>
@@ -105,7 +105,7 @@
                                                 <span class="badge bg-secondary">Uncategorized</span>
                                             {% endif %}
                                         </td>
-                                        <td>{{ "{:,.2f}"|format(investment.quantity) }}</td>
+                                        <td>{{ investment.quantity | round(2) }}</td>
                                         <td>
                                             {% if investment.current_price %}
                                                 {{ investment.current_price|currency }}
@@ -126,7 +126,7 @@
                                             <span class="{% if gain_loss >= 0 %}text-success{% else %}text-danger{% endif %}">
                                                 {{ gain_loss|currency }}
                                                 {% if gain_loss_pct != 0 %}
-                                                    <br><small>({{ "{:.1f}"|format(gain_loss_pct) }}%)</small>
+                                                    <br><small>({{ gain_loss_pct | round(1) }}%)</small>
                                                 {% endif %}
                                             </span>
                                         </td>

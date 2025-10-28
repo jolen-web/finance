@@ -1,16 +1,19 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required, current_user
 from app.models import Category
 from app import db
 
 bp = Blueprint('categories', __name__, url_prefix='/categories')
 
 @bp.route('/')
+@login_required
 def list_categories():
     """List all categories"""
-    categories = Category.query.filter_by(parent_id=None).all()
+    categories = Category.query.filter_by(parent_id=None, user_id=current_user.id).all()
     return render_template('categories/list.html', categories=categories)
 
 @bp.route('/new', methods=['GET', 'POST'])
+@login_required
 def new_category():
     """Create new category"""
     if request.method == 'POST':
@@ -22,7 +25,8 @@ def new_category():
         category = Category(
             name=name,
             is_income=is_income,
-            parent_id=parent_id
+            parent_id=parent_id,
+            user_id=current_user.id
         )
 
         db.session.add(category)
@@ -31,13 +35,14 @@ def new_category():
         flash(f'Category "{name}" created successfully!', 'success')
         return redirect(url_for('categories.list_categories'))
 
-    parent_categories = Category.query.filter_by(parent_id=None).all()
+    parent_categories = Category.query.filter_by(parent_id=None, user_id=current_user.id).all()
     return render_template('categories/form.html', category=None, parent_categories=parent_categories)
 
 @bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_category(id):
     """Edit existing category"""
-    category = Category.query.get_or_404(id)
+    category = Category.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         category.name = request.form.get('name')
@@ -50,13 +55,14 @@ def edit_category(id):
         flash(f'Category "{category.name}" updated successfully!', 'success')
         return redirect(url_for('categories.list_categories'))
 
-    parent_categories = Category.query.filter_by(parent_id=None).filter(Category.id != id).all()
+    parent_categories = Category.query.filter_by(parent_id=None, user_id=current_user.id).filter(Category.id != id).all()
     return render_template('categories/form.html', category=category, parent_categories=parent_categories)
 
 @bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_category(id):
     """Delete category"""
-    category = Category.query.get_or_404(id)
+    category = Category.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     # Check if category has transactions
     if category.transactions.count() > 0:

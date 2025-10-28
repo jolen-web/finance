@@ -123,165 +123,165 @@
     <div class="col-12">
         <div class="card">
             <div class="card-body">
-                {% if transactions.items %}
-                    <!-- Bulk Action Bar -->
-                    <div class="bulk-action-bar" id="bulkActionBar">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span><strong id="selectedCount">0</strong> transaction(s) selected</span>
-                            <div>
-                                <button type="button" class="btn btn-sm btn-danger" id="deleteSelectedBtn">
-                                    <i class="fas fa-trash"></i> Delete Selected
-                                </button>
-                                <button type="button" class="btn btn-sm btn-secondary" id="cancelSelectBtn">
-                                    <i class="fas fa-times"></i> Cancel
-                                </button>
-                            </div>
+                <!-- Bulk Action Bar -->
+                <div class="bulk-action-bar" id="bulkActionBar">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong id="selectedCount">0</strong> transaction(s) selected</span>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-danger" id="deleteSelectedBtn">
+                                <i class="fas fa-trash"></i> Delete Selected
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="cancelSelectBtn">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
                         </div>
                     </div>
+                </div>
 
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                                </th>
+                                <th>Date</th>
+                                <th>Account</th>
+                                <th>Payee</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Quick Add Row -->
+                            <tr class="quick-add-row" id="quickAddRow">
+                                <td></td>
+                                <td>
+                                    <input type="date" id="quickAddDate" class="form-control form-control-sm" required>
+                                    <div id="quickAddDateError" class="quick-add-error"></div>
+                                </td>
+                                <td>
+                                    <select id="quickAddAccount" class="form-select form-select-sm" required>
+                                        <option value="">Select account...</option>
+                                        {% for account in accounts %}
+                                            <option value="{{ account.id }}">{{ account.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <div id="quickAddAccountError" class="quick-add-error"></div>
+                                </td>
+                                <td>
+                                    <input type="text" id="quickAddPayee" class="form-control form-control-sm" placeholder="Payee">
+                                </td>
+                                <td>
+                                    <select id="quickAddCategory" class="form-select form-select-sm">
+                                        <option value="">No category</option>
+                                        {% for category in categories %}
+                                            <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" id="quickAddAmount" class="form-control form-control-sm" placeholder="Amount" step="0.01" required>
+                                    <div id="quickAddAmountError" class="quick-add-error"></div>
+                                </td>
+                                <td>
+                                    <select id="quickAddType" class="form-select form-select-sm">
+                                        <option value="expense">Expense</option>
+                                        <option value="deposit">Deposit</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <button id="quickAddBtn" class="btn btn-sm btn-success quick-add-btn" type="button">
+                                        <i class="fas fa-plus"></i> Add
+                                    </button>
+                                </td>
+                            </tr>
+
+                            {% for transaction in transactions.items %}
                                 <tr>
-                                    <th style="width: 40px;">
-                                        <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
-                                    </th>
-                                    <th>Date</th>
-                                    <th>Account</th>
-                                    <th>Payee</th>
-                                    <th>Category</th>
-                                    <th>Amount</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Quick Add Row -->
-                                <tr class="quick-add-row" id="quickAddRow">
-                                    <td></td>
                                     <td>
-                                        <input type="date" id="quickAddDate" class="form-control form-control-sm" required>
-                                        <div id="quickAddDateError" class="quick-add-error"></div>
+                                        <input type="checkbox" class="form-check-input transaction-checkbox" value="{{ transaction.id }}" data-transaction-id="{{ transaction.id }}">
+                                    </td>
+                                    <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ transaction.account.name }}</td>
+                                    <td>
+                                        <strong>{{ transaction.payee }}</strong>
+                                        {% if transaction.memo %}
+                                            <br><small class="text-muted">{{ transaction.memo }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ transaction.category.name if transaction.category else '-' }}</td>
+                                    <td class="{% if transaction.transaction_type == 'deposit' %}text-success{% else %}text-danger{% endif %}">
+                                        {{ transaction.amount|currency(true) if transaction.transaction_type == 'deposit' else (-transaction.amount)|currency }}
                                     </td>
                                     <td>
-                                        <select id="quickAddAccount" class="form-select form-select-sm" required>
-                                            <option value="">Select account...</option>
-                                            {% for account in accounts %}
-                                                <option value="{{ account.id }}">{{ account.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        <div id="quickAddAccountError" class="quick-add-error"></div>
+                                        <form action="{{ url_for('transactions.toggle_cleared', id=transaction.id) }}" method="POST" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Cleared">
+                                                {% if transaction.is_cleared %}
+                                                    <i class="fas fa-check-circle text-success"></i>
+                                                {% else %}
+                                                    <i class="far fa-circle text-muted"></i>
+                                                {% endif %}
+                                            </button>
+                                        </form>
+                                        <form action="{{ url_for('transactions.toggle_reconciled', id=transaction.id) }}" method="POST" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Reconciled">
+                                                {% if transaction.is_reconciled %}
+                                                    <i class="fas fa-shield-alt text-primary"></i>
+                                                {% else %}
+                                                    <i class="far fa-shield text-muted"></i>
+                                                {% endif %}
+                                            </button>
+                                        </form>
                                     </td>
                                     <td>
-                                        <input type="text" id="quickAddPayee" class="form-control form-control-sm" placeholder="Payee">
-                                    </td>
-                                    <td>
-                                        <select id="quickAddCategory" class="form-select form-select-sm">
-                                            <option value="">No category</option>
-                                            {% for category in categories %}
-                                                <option value="{{ category.id }}">{{ category.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <input type="number" id="quickAddAmount" class="form-control form-control-sm" placeholder="Amount" step="0.01" required>
-                                        <div id="quickAddAmountError" class="quick-add-error"></div>
-                                    </td>
-                                    <td>
-                                        <select id="quickAddType" class="form-select form-select-sm">
-                                            <option value="expense">Expense</option>
-                                            <option value="deposit">Deposit</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <button id="quickAddBtn" class="btn btn-sm btn-success quick-add-btn" type="button">
-                                            <i class="fas fa-plus"></i> Add
-                                        </button>
+                                        <a href="{{ url_for('transactions.edit_transaction', id=transaction.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-pencil-alt"></i>
+                                        </a>
+                                        <form action="{{ url_for('transactions.delete_transaction', id=transaction.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this transaction?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
                                     </td>
                                 </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
 
-                                {% for transaction in transactions.items %}
-                                    <tr>
-                                        <td>
-                                            <input type="checkbox" class="form-check-input transaction-checkbox" value="{{ transaction.id }}" data-transaction-id="{{ transaction.id }}">
-                                        </td>
-                                        <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
-                                        <td>{{ transaction.account.name }}</td>
-                                        <td>
-                                            <strong>{{ transaction.payee }}</strong>
-                                            {% if transaction.memo %}
-                                                <br><small class="text-muted">{{ transaction.memo }}</small>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ transaction.category.name if transaction.category else '-' }}</td>
-                                        <td class="{% if transaction.transaction_type == 'deposit' %}text-success{% else %}text-danger{% endif %}">
-                                            {{ transaction.amount|currency(true) if transaction.transaction_type == 'deposit' else (-transaction.amount)|currency }}
-                                        </td>
-                                        <td>
-                                            <form action="{{ url_for('transactions.toggle_cleared', id=transaction.id) }}" method="POST" style="display: inline;">
-                                                <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Cleared">
-                                                    {% if transaction.is_cleared %}
-                                                        <i class="fas fa-check-circle text-success"></i>
-                                                    {% else %}
-                                                        <i class="far fa-circle text-muted"></i>
-                                                    {% endif %}
-                                                </button>
-                                            </form>
-                                            <form action="{{ url_for('transactions.toggle_reconciled', id=transaction.id) }}" method="POST" style="display: inline;">
-                                                <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Reconciled">
-                                                    {% if transaction.is_reconciled %}
-                                                        <i class="fas fa-shield-alt text-primary"></i>
-                                                    {% else %}
-                                                        <i class="far fa-shield text-muted"></i>
-                                                    {% endif %}
-                                                </button>
-                                            </form>
-                                        </td>
-                                        <td>
-                                            <a href="{{ url_for('transactions.edit_transaction', id=transaction.id) }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-pencil-alt"></i>
-                                            </a>
-                                            <form action="{{ url_for('transactions.delete_transaction', id=transaction.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this transaction?');">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                <!-- Pagination -->
+                {% if transactions.pages > 1 %}
+                    <nav>
+                        <ul class="pagination justify-content-center">
+                            {% if transactions.has_prev %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.prev_num) }}">Previous</a>
+                                </li>
+                            {% endif %}
 
-                    <!-- Pagination -->
-                    {% if transactions.pages > 1 %}
-                        <nav>
-                            <ul class="pagination justify-content-center">
-                                {% if transactions.has_prev %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.prev_num) }}">Previous</a>
+                            {% for page_num in transactions.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                                {% if page_num %}
+                                    <li class="page-item {% if page_num == transactions.page %}active{% endif %}">
+                                        <a class="page-link" href="{{ url_for('transactions.list_transactions', page=page_num) }}">{{ page_num }}</a>
                                     </li>
+                                {% else %}
+                                    <li class="page-item disabled"><span class="page-link">...</span></li>
                                 {% endif %}
+                            {% endfor %}
 
-                                {% for page_num in transactions.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-                                    {% if page_num %}
-                                        <li class="page-item {% if page_num == transactions.page %}active{% endif %}">
-                                            <a class="page-link" href="{{ url_for('transactions.list_transactions', page=page_num) }}">{{ page_num }}</a>
-                                        </li>
-                                    {% else %}
-                                        <li class="page-item disabled"><span class="page-link">...</span></li>
-                                    {% endif %}
-                                {% endfor %}
+                            {% if transactions.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.next_num) }}">Next</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
 
-                                {% if transactions.has_next %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.next_num) }}">Next</a>
-                                    </li>
-                                {% endif %}
-                            </ul>
-                        </nav>
-                    {% endif %}
-                {% else %}
+                {% if not transactions.items %}
                     <div class="text-center py-5">
                         <i class="fas fa-list" style="font-size: 3rem; color: #ccc;"></i>
                         <p class="text-muted mt-3">No transactions found.</p>
@@ -290,10 +290,7 @@
                         </a>
                     </div>
                 {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
+
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

@@ -35,18 +35,25 @@ def get_currency_info(currency_code=None):
                                                  current_app.config['CURRENCIES']['PHP'])
 
 @bp.route('/')
+@login_required
 def index():
     """Settings page"""
     settings = load_settings()
     currencies = current_app.config['CURRENCIES']
-    current_currency = settings.get('currency', current_app.config['DEFAULT_CURRENCY'])
-    categories = Category.query.all()
+    current_currency = settings.get('currency')
+    if not current_currency:
+        current_currency = current_app.config['DEFAULT_CURRENCY']
 
-    return render_template('settings/index.html',
-                         settings=settings,
-                         currencies=currencies,
-                         current_currency=current_currency,
-                         categories=categories)
+    try:
+        return render_template('settings/index.html',
+                             settings=settings,
+                             currencies=currencies,
+                             current_currency=current_currency,
+                             categories=categories)
+    except Exception as e:
+        current_app.logger.error(f"Error rendering settings index: {e}", exc_info=True)
+        flash('An error occurred while loading the settings page.', 'danger')
+        return redirect(url_for('main.index'))
 
 @bp.route('/update', methods=['POST'])
 def update():
@@ -119,7 +126,7 @@ def new_category():
             flash('Category with this name already exists', 'danger')
             return redirect(url_for('settings.index'))
 
-        category = Category(name=name, is_income=is_income, parent_id=parent_id)
+        category = Category(name=name, is_income=is_income, parent_id=parent_id, user_id=current_user.id)
         db.session.add(category)
         db.session.commit()
 
@@ -131,8 +138,7 @@ def new_category():
 
 @bp.route('/categories/<int:id>/edit', methods=['GET', 'POST'])
 def edit_category(id):
-    """Edit a category from settings"""
-    category = Category.query.get_or_404(id)
+    category = Category.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
@@ -164,7 +170,7 @@ def edit_category(id):
 @bp.route('/categories/<int:id>/delete', methods=['POST'])
 def delete_category(id):
     """Delete a category from settings"""
-    category = Category.query.get_or_404(id)
+    category = Category.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     # Check if category has transactions
     if category.transactions.count() > 0:
@@ -187,9 +193,9 @@ def delete_category(id):
 @login_required
 def dashboard_preferences():
     """Manage dashboard display preferences"""
-    prefs = DashboardPreferences.query.first()
+    prefs = DashboardPreferences.query.filter_by(user_id=current_user.id).first()
     if not prefs:
-        prefs = DashboardPreferences()
+        prefs = DashboardPreferences(user_id=current_user.id)
         db.session.add(prefs)
         db.session.commit()
 

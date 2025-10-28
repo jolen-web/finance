@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
+from flask_login import login_required, current_user
 from app.models import Investment, InvestmentCategory, Account
 from app import db
 from datetime import datetime
@@ -6,28 +7,35 @@ from datetime import datetime
 bp = Blueprint('investments', __name__, url_prefix='/investments')
 
 @bp.route('/')
+@login_required
 def index():
     """Investments dashboard"""
-    investments = Investment.query.all()
-    categories = InvestmentCategory.query.all()
+    investments = Investment.query.filter_by(user_id=current_user.id).all()
+    categories = InvestmentCategory.query.filter_by(user_id=current_user.id).all()
 
     # Calculate portfolio totals
     total_invested = sum(inv.purchase_price * inv.quantity for inv in investments if inv.purchase_price and inv.quantity)
     total_current_value = sum(inv.current_value for inv in investments if inv.current_value)
     total_gain_loss = total_current_value - total_invested if total_current_value else 0
 
-    return render_template('investments/index.html',
-                         investments=investments,
-                         categories=categories,
-                         total_invested=total_invested,
-                         total_current_value=total_current_value,
-                         total_gain_loss=total_gain_loss)
+    try:
+        return render_template('investments/index.html',
+                             investments=investments,
+                             categories=categories,
+                             total_invested=total_invested,
+                             total_current_value=total_current_value,
+                             total_gain_loss=total_gain_loss)
+    except Exception as e:
+        current_app.logger.error(f"Error rendering investments index: {e}", exc_info=True)
+        flash('An error occurred while loading the investments dashboard.', 'danger')
+        return redirect(url_for('main.index'))
 
 @bp.route('/new', methods=['GET', 'POST'])
+@login_required
 def new_investment():
     """Create new investment"""
-    categories = InvestmentCategory.query.all()
-    accounts = Account.query.filter_by(is_active=True).all()
+    categories = InvestmentCategory.query.filter_by(user_id=current_user.id).all()
+    accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
 
     if request.method == 'POST':
         name = request.form.get('name')
@@ -53,6 +61,7 @@ def new_investment():
             purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
 
         investment = Investment(
+            user_id=current_user.id,
             name=name,
             ticker=ticker,
             investment_type=investment_type,
@@ -68,6 +77,7 @@ def new_investment():
 
         db.session.add(investment)
         db.session.commit()
+        current_app.logger.debug(f"Investment '{name}' created with ID: {investment.id}")
 
         flash(f'Investment "{name}" created successfully!', 'success')
         return redirect(url_for('investments.index'))
@@ -75,11 +85,12 @@ def new_investment():
     return render_template('investments/form.html', investment=None, categories=categories, accounts=accounts)
 
 @bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_investment(id):
     """Edit investment"""
-    investment = Investment.query.get_or_404(id)
-    categories = InvestmentCategory.query.all()
-    accounts = Account.query.filter_by(is_active=True).all()
+    investment = Investment.query.filter_by(id=id, user_id=current_user.id).first_or_404()
+    categories = InvestmentCategory.query.filter_by(user_id=current_user.id).all()
+    accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
 
     if request.method == 'POST':
         investment.name = request.form.get('name')
@@ -111,9 +122,10 @@ def edit_investment(id):
     return render_template('investments/form.html', investment=investment, categories=categories, accounts=accounts)
 
 @bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_investment(id):
     """Delete investment"""
-    investment = Investment.query.get_or_404(id)
+    investment = Investment.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     name = investment.name
 
     db.session.delete(investment)
@@ -123,12 +135,14 @@ def delete_investment(id):
     return redirect(url_for('investments.index'))
 
 @bp.route('/categories')
+@login_required
 def categories():
     """Manage investment categories"""
-    categories = InvestmentCategory.query.all()
+    categories = InvestmentCategory.query.filter_by(user_id=current_user.id).all()
     return render_template('investments/categories.html', categories=categories)
 
 @bp.route('/categories/new', methods=['GET', 'POST'])
+@login_required
 def new_category():
     """Create new investment category"""
     if request.method == 'POST':
@@ -137,12 +151,13 @@ def new_category():
         color = request.form.get('color', '#0066cc')
 
         # Check if category already exists
-        existing = InvestmentCategory.query.filter_by(name=name).first()
+        existing = InvestmentCategory.query.filter_by(name=name, user_id=current_user.id).first()
         if existing:
             flash('Category already exists!', 'danger')
             return redirect(url_for('investments.categories'))
 
         category = InvestmentCategory(
+            user_id=current_user.id,
             name=name,
             description=description,
             color=color
@@ -157,9 +172,9 @@ def new_category():
     return render_template('investments/category_form.html', category=None)
 
 @bp.route('/categories/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_category(id):
-    """Edit investment category"""
-    category = InvestmentCategory.query.get_or_404(id)
+    category = InvestmentCategory.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         category.name = request.form.get('name')
@@ -174,13 +189,14 @@ def edit_category(id):
     return render_template('investments/category_form.html', category=category)
 
 @bp.route('/categories/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_category(id):
     """Delete investment category"""
-    category = InvestmentCategory.query.get_or_404(id)
+    category = InvestmentCategory.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     name = category.name
 
     # Check if category is in use
-    investments_count = Investment.query.filter_by(category_id=id).count()
+    investments_count = Investment.query.filter_by(category_id=id, user_id=current_user.id).count()
     if investments_count > 0:
         flash(f'Cannot delete category "{name}" - it has {investments_count} investment(s) assigned to it', 'danger')
         return redirect(url_for('investments.categories'))
