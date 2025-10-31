@@ -1,15 +1,74 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
+from urllib.parse import urlparse, urljoin
 from app.models import User
-from app import db
-from app.db_manager import db_manager
-from werkzeug.exceptions import BadRequest
+from app import db, db_manager, limiter
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 
+def is_safe_url(target):
+    """Check if a redirect URL is safe (same domain)"""
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+
+def validate_password_strength(password):
+    """Validate password meets security requirements"""
+    import re
+    errors = []
+
+    if len(password) < 12:
+        errors.append('Password must be at least 12 characters long')
+    if not re.search(r'[A-Z]', password):
+        errors.append('Password must contain at least one uppercase letter')
+    if not re.search(r'[a-z]', password):
+        errors.append('Password must contain at least one lowercase letter')
+    if not re.search(r'\d', password):
+        errors.append('Password must contain at least one number')
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        errors.append('Password must contain at least one special character')
+
+    return errors
+
+def validate_email(email):
+    """Validate email format"""
+    import re
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(email_pattern, email) is not None
+
+def validate_registration(username, email, password, password_confirm):
+    """Validates user registration form data."""
+    errors = []
+    if not username:
+        errors.append('Username is required')
+    elif len(username) < 3:
+        errors.append('Username must be at least 3 characters long')
+    elif User.query.filter_by(username=username).first():
+        errors.append('Username already exists')
+
+    if not email:
+        errors.append('Email is required')
+    elif not validate_email(email):
+        errors.append('Invalid email address format')
+    elif User.query.filter_by(email=email).first():
+        errors.append('Email already registered')
+
+    if not password:
+        errors.append('Password is required')
+    else:
+        # Validate password strength
+        password_errors = validate_password_strength(password)
+        errors.extend(password_errors)
+
+    if password != password_confirm:
+        errors.append('Passwords do not match')
+
+    return errors
+
 @bp.route('/register', methods=['GET', 'POST'])
+@limiter.limit("3 per hour")
 def register():
-    """User registration page"""
+    """User registration page."""
     if current_user.is_authenticated:
         return redirect(url_for('main.index'))
 
@@ -19,46 +78,20 @@ def register():
         password = request.form.get('password', '')
         password_confirm = request.form.get('password_confirm', '')
 
-        # Validation
-        errors = []
-
-        if not username:
-            errors.append('Username is required')
-        elif len(username) < 3:
-            errors.append('Username must be at least 3 characters long')
-        elif User.query.filter_by(username=username).first():
-            errors.append('Username already exists')
-
-        if not email:
-            errors.append('Email is required')
-        elif '@' not in email:
-            errors.append('Invalid email address')
-        elif User.query.filter_by(email=email).first():
-            errors.append('Email already registered')
-
-        if not password:
-            errors.append('Password is required')
-        elif len(password) < 6:
-            errors.append('Password must be at least 6 characters long')
-
-        if password != password_confirm:
-            errors.append('Passwords do not match')
+        errors = validate_registration(username, email, password, password_confirm)
 
         if errors:
             for error in errors:
                 flash(error, 'danger')
             return render_template('auth/register.html')
 
-        # Create new user
         try:
             user = User(username=username, email=email)
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
 
-            # Create user's isolated database
-            if not db_manager.create_user_database(user.id):
-                # If database creation fails, rollback user creation
+            if not current_app.db_manager.initialize_user_data(user.id):
                 db.session.delete(user)
                 db.session.commit()
                 flash('Error creating user database. Please try again.', 'danger')
@@ -68,13 +101,14 @@ def register():
             return redirect(url_for('auth.login'))
         except Exception as e:
             db.session.rollback()
-            flash(f'Error creating account: {str(e)}', 'danger')
+            current_app.logger.error(f'Registration error for {username}: {str(e)}', exc_info=True)
+            flash('An error occurred during registration. Please try again later.', 'danger')
             return render_template('auth/register.html')
 
     return render_template('auth/register.html')
 
-
 @bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per 15 minutes")
 def login():
     """User login page"""
     if current_user.is_authenticated:
@@ -112,9 +146,9 @@ def login():
         login_user(user, remember=remember_me)
         flash(f'Welcome back, {user.username}!', 'success')
 
-        # Redirect to next page or dashboard
+        # Redirect to next page or dashboard (with open redirect protection)
         next_page = request.args.get('next')
-        if not next_page or url_has_allowed_host_and_scheme(next_page):
+        if not next_page or not is_safe_url(next_page):
             next_page = url_for('main.index')
 
         return redirect(next_page)
@@ -130,10 +164,3 @@ def logout():
     logout_user()
     flash(f'You have been logged out. Goodbye, {username}!', 'info')
     return redirect(url_for('auth.login'))
-
-
-def url_has_allowed_host_and_scheme(url):
-    """Check if URL is safe for redirect"""
-    from urllib.parse import urlparse
-    parsed_url = urlparse(url)
-    return parsed_url.scheme in ('', 'http', 'https') and parsed_url.netloc == ''

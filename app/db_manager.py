@@ -1,172 +1,80 @@
-"""Database manager for single PostgreSQL database with user_id filtering"""
-import os
 from pathlib import Path
+from app.models import Category, Account
 
-
-class DatabaseManager:
-    """Manages single PostgreSQL database with user_id-based data isolation"""
-
-    def __init__(self):
-        """Initialize database manager with PostgreSQL connection details"""
-        self.flask_env = os.environ.get('FLASK_ENV', 'development')
+class DBManager:
+    def __init__(self, db):
+        self.db = db
 
     def get_database_uri(self):
-        """
-        Get the shared database URI (no user_id in URI).
+        # This is now only used for the default production config
+        db_path = Path(__file__).parent.parent / 'data' / 'finance.db'
+        db_path.parent.mkdir(exist_ok=True)
+        return f'sqlite:///{db_path.absolute()}'
 
-        Returns:
-            Database connection URI
-        """
-        if self.flask_env == 'production':
-            # Cloud SQL production settings
-            db_user = os.environ.get('DB_USER', 'postgres')
-            db_pass = os.environ.get('DB_PASSWORD', '')
-            cloud_sql_connection_name = os.environ.get(
-                'CLOUD_SQL_CONNECTION_NAME',
-                'jinolen:us-central1:finance-db'
-            )
-            db_name = os.environ.get('DB_NAME', 'finance')
-
-            return (
-                f'postgresql+psycopg2://{db_user}:{db_pass}@/'
-                f'{db_name}?host=/cloudsql/{cloud_sql_connection_name}'
-            )
-        else:
-            # Local development - use PostgreSQL
-            db_user = os.environ.get('DB_USER', 'postgres')
-            db_pass = os.environ.get('DB_PASSWORD', 'postgres')
-            db_host = os.environ.get('DB_HOST', 'localhost')
-            db_port = os.environ.get('DB_PORT', '5432')
-            db_name = os.environ.get('DB_NAME', 'finance_app')
-
-            return (
-                f'postgresql+psycopg2://{db_user}:{db_pass}@'
-                f'{db_host}:{db_port}/{db_name}'
-            )
-
-    def create_user_database(self, user_id):
-        """
-        Initialize default categories for a user in the shared database.
-
-        Args:
-            user_id: The user ID
-
-        Returns:
-            True if successful, False otherwise
-        """
+    def initialize_user_data(self, user_id):
+        """Initializes default categories and accounts for a new user."""
+        import logging
+        logger = logging.getLogger(__name__)
         try:
-            # Initialize default categories for the user
             self._initialize_default_categories(user_id)
+            self._initialize_default_accounts(user_id)
+            self.db.session.commit()
             return True
         except Exception as e:
-            print(f'Error initializing user data: {e}')
-            import traceback
-            traceback.print_exc()
-            return False
-
-    def delete_user_database(self, user_id):
-        """
-        Delete all user data from the shared database (for account deletion).
-
-        Args:
-            user_id: The user ID
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            from app import db
-            from app.models import User
-
-            # Delete the user and all associated data (cascading deletes)
-            user = User.query.get(user_id)
-            if user:
-                db.session.delete(user)
-                db.session.commit()
-
-            return True
-        except Exception as e:
-            print(f'Error deleting user data: {e}')
-            return False
-
-    def database_exists(self, user_id):
-        """
-        Check if a user has been initialized in the shared database.
-
-        Args:
-            user_id: The user ID
-
-        Returns:
-            True if user exists, False otherwise
-        """
-        try:
-            from app.models import User
-            user = User.query.get(user_id)
-            return user is not None
-        except Exception as e:
-            print(f'Error checking user: {e}')
+            self.db.session.rollback()
+            logger.error(f"Error initializing user data for user {user_id}: {e}", exc_info=True)
             return False
 
     def _initialize_default_categories(self, user_id):
-        """
-        Initialize default categories for a new user in the shared database.
+        """Creates a set of default categories for a new user."""
+        default_categories = {
+            "Income": ["Salary", "Bonus", "Interest Income"],
+            "Expense": {
+                "Housing": ["Rent/Mortgage", "Property Tax", "Utilities"],
+                "Transportation": ["Gas/Fuel", "Public Transit", "Car Maintenance"],
+                "Food": ["Groceries", "Restaurants"],
+                "Personal Care": ["Haircut", "Toiletries"],
+                "Entertainment": ["Movies", "Concerts", "Games"],
+                "Debt": ["Credit Card Payment", "Loan Payment"]
+            }
+        }
 
-        Args:
-            user_id: The user ID
+        # Income categories
+        income_parent = self._get_or_create_category(user_id, "Income", is_income=True)
+        for cat_name in default_categories["Income"]:
+            self._get_or_create_category(user_id, cat_name, parent=income_parent, is_income=True)
 
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            from app.models import Category
-            from app import db
+        # Expense categories
+        expense_parent = self._get_or_create_category(user_id, "Expense")
+        for parent_name, sub_cats in default_categories["Expense"].items():
+            parent_cat = self._get_or_create_category(user_id, parent_name, parent=expense_parent)
+            for sub_cat_name in sub_cats:
+                self._get_or_create_category(user_id, sub_cat_name, parent=parent_cat)
 
-            # Default categories: expense categories and income categories
-            default_categories = [
-                # Expense categories
-                ('Groceries', False),
-                ('Utilities', False),
-                ('Transport', False),
-                ('Entertainment', False),
-                ('Healthcare', False),
-                ('Dining Out', False),
-                ('Shopping', False),
-                ('Subscriptions', False),
-                ('Insurance', False),
-                ('Other Expenses', False),
-                # Income categories
-                ('Salary', True),
-                ('Bonus', True),
-                ('Interest', True),
-                ('Dividends', True),
-                ('Other Income', True),
-            ]
+    def _initialize_default_accounts(self, user_id):
+        """Creates default 'Cash' and 'Credit Card' accounts for a new user."""
+        if not Account.query.filter_by(user_id=user_id, name="Cash").first():
+            cash_account = Account(user_id=user_id, name="Cash", account_type="cash", starting_balance=0)
+            self.db.session.add(cash_account)
 
-            for category_name, is_income in default_categories:
-                # Check if category already exists for this user
-                existing = Category.query.filter_by(
-                    user_id=user_id,
-                    name=category_name,
-                    is_income=is_income
-                ).first()
+        if not Account.query.filter_by(user_id=user_id, name="Credit Card").first():
+            cc_account = Account(user_id=user_id, name="Credit Card", account_type="credit_card", starting_balance=0)
+            self.db.session.add(cc_account)
 
-                if not existing:
-                    category = Category(
-                        user_id=user_id,
-                        name=category_name,
-                        is_income=is_income
-                    )
-                    db.session.add(category)
-
-            db.session.commit()
-            return True
-        except Exception as e:
-            print(f'Error initializing default categories: {e}')
-            import traceback
-            traceback.print_exc()
-            db.session.rollback()
-            return False
-
-
-# Global database manager instance
-db_manager = DatabaseManager()
+    def _get_or_create_category(self, user_id, name, parent=None, is_income=False):
+        """Finds an existing category or creates a new one."""
+        category = Category.query.filter_by(
+            user_id=user_id,
+            name=name,
+            parent_id=parent.id if parent else None
+        ).first()
+        if not category:
+            category = Category(
+                user_id=user_id,
+                name=name,
+                parent=parent,
+                is_income=is_income
+            )
+            self.db.session.add(category)
+            self.db.session.flush()  # Flush to get the ID for potential children
+        return category

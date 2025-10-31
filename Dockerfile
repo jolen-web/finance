@@ -1,45 +1,41 @@
-FROM python:3.11-slim
+# Stage 1: Build stage
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    tesseract-ocr \
-    && rm -rf /var/lib/apt/lists/*
+# Install uv
+RUN apt-get update && apt-get install -y libpq-dev gcc
+RUN pip install uv
 
-# Copy requirements first for better caching
+# Copy requirements and install dependencies
 COPY requirements.txt .
+RUN uv pip install --system --no-cache -r requirements.txt
+RUN uv pip install --system --no-cache gunicorn
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the rest of the application code
+COPY . .
+
+# Stage 2: Final stage
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y tesseract-ocr libpq5 && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy installed dependencies from the builder stage
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY . .
 
-# Expose port (Cloud Run uses 8080 by default, but we can use any port)
+# Expose the port Gunicorn will run on
 EXPOSE 5000
 
 # Set environment variables
-ENV FLASK_APP=run.py
-ENV FLASK_ENV=production
-ENV FLASK_PORT=5000
-ENV PORT=5000
+ENV FLASK_APP="wsgi:app"
+ENV FLASK_ENV="production"
 
-# Create data directory and instance directory for SQLite
-RUN mkdir -p /app/data /app/instance
-
-# Run Flask with gunicorn for production
-RUN pip install --no-cache-dir gunicorn
-
-# Create entrypoint script that initializes DB and runs the app
-RUN echo '#!/bin/bash' > /app/entrypoint.sh && \
-    echo 'set -e' >> /app/entrypoint.sh && \
-    echo '' >> /app/entrypoint.sh && \
-    echo 'echo "Initializing database..."' >> /app/entrypoint.sh && \
-    echo 'python init_db.py || echo "DB init script not found, skipping"' >> /app/entrypoint.sh && \
-    echo '' >> /app/entrypoint.sh && \
-    echo 'echo "Starting Flask app with gunicorn..."' >> /app/entrypoint.sh && \
-    echo 'exec gunicorn --bind :${PORT:-5000} --workers 4 --timeout 120 --access-logfile - --error-logfile - "run:app"' >> /app/entrypoint.sh && \
-    chmod +x /app/entrypoint.sh
-
-CMD ["/app/entrypoint.sh"]
+# Run the application with Gunicorn
+# Using 2 workers for better concurrency and fault tolerance
+CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 8 --worker-class gevent --timeout 120 wsgi:app

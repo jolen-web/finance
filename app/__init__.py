@@ -1,12 +1,23 @@
-from flask import Flask, g
+from flask import Flask, g, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager, current_user
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
 from config import Config
 
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
+csrf = CSRFProtect()
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+db_manager = None
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -15,9 +26,29 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
+    csrf.init_app(app)
+    limiter.init_app(app)
     login_manager.login_view = 'auth.login'
-    login_manager.login_message = 'Please log in to access this page.'
-    login_manager.login_message_category = 'info'
+
+    # Security headers with Talisman (only in production)
+    if app.config['FLASK_ENV'] == 'production':
+        csp = {
+            'default-src': "'self'",
+            'img-src': ['*', 'data:', 'blob:'],
+            'script-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'unpkg.com'],
+            'style-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'fonts.googleapis.com'],
+            'font-src': ["'self'", 'fonts.gstatic.com'],
+            'connect-src': "'self'"
+        }
+        Talisman(app,
+                 content_security_policy=csp,
+                 force_https=True,
+                 strict_transport_security=True,
+                 session_cookie_secure=True,
+                 session_cookie_samesite='Lax')
+
+    from app.db_manager import DBManager
+    app.db_manager = DBManager(db)
 
     # User loader for Flask-Login
     @login_manager.user_loader
@@ -26,7 +57,7 @@ def create_app(config_class=Config):
         return User.query.get(int(user_id))
 
     # Register blueprints
-    from app.routes import main, accounts, transactions, categories, backup, backup_view, settings, receipts, ai_categorizer, financial_advisor, tax_assistant, scenario_planner, investments, auth, assets
+    from app.routes import main, accounts, transactions, categories, backup, backup_view, settings, receipts, ai_categorizer, financial_advisor, tax_assistant, scenario_planner, investments, auth, assets, diag
     app.register_blueprint(main.bp)
     app.register_blueprint(accounts.bp)
     app.register_blueprint(transactions.bp)
@@ -42,11 +73,24 @@ def create_app(config_class=Config):
     app.register_blueprint(investments.bp)
     app.register_blueprint(auth.bp)
     app.register_blueprint(assets.bp)
+    app.register_blueprint(diag.bp)
 
     # Ensure data directory exists
     import os
     data_dir = os.path.join(app.root_path, '..', 'data')
     os.makedirs(data_dir, exist_ok=True)
+
+    # Configure structured logging for Cloud Run
+    if app.config['FLASK_ENV'] == 'production':
+        import logging
+        import sys
+        from pythonjsonlogger import jsonlogger
+
+        logHandler = logging.StreamHandler(sys.stdout)
+        formatter = jsonlogger.JsonFormatter()
+        logHandler.setFormatter(formatter)
+        app.logger.addHandler(logHandler)
+        app.logger.setLevel(logging.INFO)
 
     # Register template filters
     from app.routes.settings import get_currency_info
@@ -98,5 +142,23 @@ def create_app(config_class=Config):
             import logging
             logging.error(f"Error in inject_dashboard_prefs: {e}")
         return {'prefs': None}
+
+    # Register error handlers
+    @app.errorhandler(404)
+    def not_found_error(error):
+        """Handle 404 Not Found errors"""
+        return render_template('errors/404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Handle 500 Internal Server errors"""
+        db.session.rollback()
+        app.logger.error(f'Server Error: {error}', exc_info=True)
+        return render_template('errors/500.html'), 500
+
+    @app.errorhandler(403)
+    def forbidden_error(error):
+        """Handle 403 Forbidden errors"""
+        return render_template('errors/403.html'), 403
 
     return app

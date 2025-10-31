@@ -31,7 +31,7 @@ except ImportError:
 # Import Gemini
 try:
     import google.generativeai as genai
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    GEMINI_API_KEY = os.getenv('GOOGLE_API_KEY')
     if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
         GEMINI_AVAILABLE = True
@@ -52,8 +52,53 @@ class ReceiptOCRAgent:
         return '.' in filename and \
                filename.rsplit('.', 1)[1].lower() in self.allowed_extensions
 
+    def validate_file_content(self, file_path):
+        """Validate file content using magic bytes (file signatures)"""
+        import imghdr
+
+        # Define magic bytes for allowed file types
+        allowed_signatures = {
+            # JPEG
+            b'\xFF\xD8\xFF': 'jpeg',
+            # PNG
+            b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A': 'png',
+            # PDF
+            b'\x25\x50\x44\x46': 'pdf',
+            # WebP
+            b'RIFF': 'webp'  # WebP starts with RIFF, needs additional check
+        }
+
+        try:
+            with open(file_path, 'rb') as f:
+                header = f.read(32)  # Read first 32 bytes
+
+                # Check PDF
+                if header.startswith(b'%PDF'):
+                    return True, 'pdf'
+
+                # Check PNG
+                if header.startswith(b'\x89PNG\r\n\x1a\n'):
+                    return True, 'png'
+
+                # Check JPEG
+                if header.startswith(b'\xff\xd8\xff'):
+                    return True, 'jpeg'
+
+                # Check WebP (RIFF....WEBP format)
+                if header.startswith(b'RIFF') and header[8:12] == b'WEBP':
+                    return True, 'webp'
+
+                # Use imghdr as fallback for image detection
+                img_type = imghdr.what(file_path)
+                if img_type in ['jpeg', 'png', 'webp']:
+                    return True, img_type
+
+                return False, None
+        except Exception as e:
+            return False, None
+
     def save_receipt_file(self, file, transaction_id):
-        """Save uploaded receipt file"""
+        """Save uploaded receipt file with content validation"""
         if not file or not self.allowed_file(file.filename):
             return None, "Invalid file type"
 
@@ -69,11 +114,22 @@ class ReceiptOCRAgent:
 
         filepath = trans_dir / filename
 
-        # Save file
+        # Save file temporarily
         try:
             file.save(str(filepath))
+
+            # Validate file content (magic bytes check)
+            is_valid, detected_type = self.validate_file_content(str(filepath))
+            if not is_valid:
+                # Delete invalid file
+                os.remove(str(filepath))
+                return None, "Invalid file content. File does not match allowed types."
+
             return str(filepath), filename
         except Exception as e:
+            # Clean up on error
+            if os.path.exists(str(filepath)):
+                os.remove(str(filepath))
             return None, str(e)
 
     def extract_text_from_image(self, image_path):
@@ -91,26 +147,42 @@ class ReceiptOCRAgent:
                 image = image.convert('RGB')
                 logger.info(f"Converted image to RGB mode")
 
-            # Try different OCR configurations
-            # Config 1: Default
-            text = pytesseract.image_to_string(image)
-            logger.info(f"OCR extracted {len(text)} characters (default config)")
+            # --- Advanced Preprocessing ---
+            from PIL import ImageEnhance, ImageFilter
 
-            # If we got very little text, try with preprocessing
-            if len(text.strip()) < 50:
-                logger.warning(f"Low text extraction ({len(text)} chars), trying with preprocessing...")
+            # 1. Resize to a larger size for better OCR (e.g., 300 DPI)
+            width, height = image.size
+            new_size = (width * 2, height * 2)
+            image = image.resize(new_size, Image.LANCZOS)
+            logger.info(f"Resized image to {new_size}")
 
-                # Convert to grayscale
-                from PIL import ImageEnhance, ImageFilter
-                gray_image = image.convert('L')
+            # 2. Convert to grayscale
+            gray_image = image.convert('L')
 
-                # Increase contrast
-                enhancer = ImageEnhance.Contrast(gray_image)
-                enhanced_image = enhancer.enhance(2.0)
+            # 3. Increase contrast
+            enhancer = ImageEnhance.Contrast(gray_image)
+            enhanced_image = enhancer.enhance(2.0)
 
-                # Try OCR again
-                text = pytesseract.image_to_string(enhanced_image)
-                logger.info(f"OCR extracted {len(text)} characters (enhanced config)")
+            # 4. Binarization (convert to black and white)
+            threshold = 128
+            binary_image = enhanced_image.point(lambda x: 0 if x < threshold else 255, '1')
+            logger.info(f"Applied binarization with threshold {threshold}")
+
+            # 5. Noise removal (optional, can sometimes hurt)
+            # denoised_image = binary_image.filter(ImageFilter.MedianFilter(size=3))
+
+            # --- OCR Attempts ---
+
+            # Config 1: Default OCR on preprocessed image
+            text = pytesseract.image_to_string(binary_image, config='--psm 6')
+            logger.info(f"OCR extracted {len(text)} characters (preprocessed config)")
+
+            # If we got very little text, try without preprocessing
+            if len(text.strip()) < 20:
+                logger.warning(f"Low text extraction ({len(text)} chars), trying with original image...")
+                original_image = Image.open(image_path)
+                text = pytesseract.image_to_string(original_image)
+                logger.info(f"OCR extracted {len(text)} characters (original image)")
 
             logger.info("="*80)
             logger.info("EXTRACTED OCR TEXT:")
@@ -402,7 +474,7 @@ CRITICAL RULES:
 
         return transactions
 
-    def parse_statement_data(self, ocr_text):
+    def parse_statement_data(self, ocr_text, user_id):
         """Parse tabular statement data (credit card/bank statements) to extract multiple transactions
 
         Enhanced to handle various credit card statement formats including:
@@ -427,6 +499,10 @@ CRITICAL RULES:
         statement_total = None
         statement_info = {'total': None, 'previous_balance': None, 'new_balance': None}
 
+        # Get learned patterns from the database
+        from app.models import RegexPattern
+        learned_patterns = RegexPattern.query.filter_by(user_id=user_id).order_by(RegexPattern.confidence_score.desc()).all()
+        
         # Common patterns for credit card statements
         patterns = [
             # Pattern 1: Two dates followed by description and amount (e.g., "09/21/25  09/22/25  MERCHANT NAME  859.52")
@@ -448,6 +524,9 @@ CRITICAL RULES:
             # Pattern 9: Month name with more flexible spacing
             r'([A-Za-z]+\s+\d{1,2},?\s+\d{4})\s+(.+?)\s{2,}([\d,]+\.\d{2})',
         ]
+
+        for p in learned_patterns:
+            patterns.insert(0, p.pattern)
 
         line_num = 0
         for line in lines:
@@ -725,7 +804,7 @@ CRITICAL RULES:
 
         return data
 
-    def extract_receipt_data(self, file, temp_folder='temp', password=None):
+    def extract_receipt_data(self, file, user_id, temp_folder='temp', password=None):
         """Extract data from receipt without creating database records
 
         Args:
@@ -736,62 +815,83 @@ CRITICAL RULES:
         Returns:
             tuple: (filepath, filename, parsed_data, file_type) or (None, None, error_message, None)
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("--- Starting Receipt Extraction ---")
+
         # Save file to temporary location
         filepath, filename_or_error = self.save_receipt_file(file, temp_folder)
         if not filepath:
+            logger.error(f"Failed to save file: {filename_or_error}")
             return None, None, filename_or_error, None
+        logger.info(f"File saved to: {filepath}")
 
         file_type = file.content_type or 'image/jpeg'
-
-        # Check if file is PDF
         is_pdf = filepath.lower().endswith('.pdf')
 
-        # NEW APPROACH: Extract text with OCR first, then use Gemini to structure it
-        parsed_data = None
-        ocr_text = None
-        import logging
-        logger = logging.getLogger(__name__)
-
         # Step 1: Extract text using OCR or PDF parser
+        ocr_text = None
         if is_pdf:
-            # Extract text from PDF
+            logger.info("PDF file detected, extracting text...")
             ocr_text, error = self.extract_text_from_pdf(filepath, password)
-            if error:
-                # Check if password is required
-                if error == "PDF_PASSWORD_REQUIRED":
-                    return None, None, "PDF_PASSWORD_REQUIRED", None
-                return None, None, error, None
         else:
-            # Perform OCR on image
+            logger.info("Image file detected, extracting text with Tesseract...")
             ocr_text, error = self.extract_text_from_image(filepath)
-            if error:
-                return None, None, error, None
+
+        if error:
+            logger.error(f"Text extraction failed: {error}")
+            return None, None, error, None
+        if not ocr_text or len(ocr_text.strip()) < 10:
+            logger.warning("OCR text is empty or too short.")
+            # Even if OCR is weak, we can still try Gemini Vision on the image itself
+        else:
+            logger.info(f"Successfully extracted {len(ocr_text)} characters of text.")
 
         # Step 2: Try to parse with Gemini (intelligent structuring)
-        if ocr_text and GEMINI_AVAILABLE:
-            logger.info("Step 2: Sending OCR text to Gemini for intelligent parsing...")
-            gemini_data, gemini_error = self.extract_with_gemini_text(ocr_text)
-
-            if gemini_data and gemini_error is None:
-                # Check if Gemini returned any line items
-                if gemini_data.get('line_items') and len(gemini_data['line_items']) > 0:
-                    parsed_data = gemini_data
-                    parsed_data['_extraction_method'] = 'gemini'
-                    logger.info(f"✓ Gemini parsed {len(gemini_data['line_items'])} transactions from OCR text")
+        parsed_data = None
+        if GEMINI_AVAILABLE:
+            if not is_pdf:
+                logger.info("Attempting to parse with Gemini Vision API (image input)...")
+                gemini_data, gemini_error = self.extract_with_gemini(filepath)
+                if gemini_data and not gemini_error:
+                    if gemini_data.get('line_items'):
+                        parsed_data = gemini_data
+                        parsed_data['_extraction_method'] = 'gemini_vision'
+                        logger.info(f"✓ Gemini Vision parsed {len(gemini_data['line_items'])} transactions.")
+                    else:
+                        logger.warning("✗ Gemini Vision returned empty line_items.")
                 else:
-                    logger.warning("✗ Gemini returned empty line_items, falling back to regex parsing")
-            else:
-                logger.warning(f"✗ Gemini parsing failed: {gemini_error}, falling back to regex parsing")
+                    logger.warning(f"✗ Gemini Vision parsing failed: {gemini_error}")
 
-        # Step 3: Fall back to regex-based parsing if Gemini failed
+            if not parsed_data and ocr_text:
+                logger.info("Attempting to parse with Gemini Text API (text input)...")
+                gemini_data, gemini_error = self.extract_with_gemini_text(ocr_text)
+                if gemini_data and not gemini_error:
+                    if gemini_data.get('line_items'):
+                        parsed_data = gemini_data
+                        parsed_data['_extraction_method'] = 'gemini_text'
+                        logger.info(f"✓ Gemini Text parsed {len(gemini_data['line_items'])} transactions.")
+                    else:
+                        logger.warning("✗ Gemini Text returned empty line_items.")
+                else:
+                    logger.warning(f"✗ Gemini Text parsing failed: {gemini_error}")
+        else:
+            logger.info("Gemini is not available. Skipping to regex parsing.")
+
+        # Step 3: Fall back to regex-based parsing if Gemini failed or not available
         if not parsed_data:
-            logger.info("Step 3: Using regex-based parsing as fallback...")
-            parsed_data = self.parse_statement_data(ocr_text)
+            logger.info("Falling back to regex-based parsing...")
+            if ocr_text:
+                parsed_data = self.parse_statement_data(ocr_text, user_id)
+                if parsed_data and parsed_data.get('line_items'):
+                    parsed_data['_extraction_method'] = 'regex'
+                    logger.info(f"✓ Regex parsing extracted {len(parsed_data['line_items'])} transactions.")
+                else:
+                    logger.warning("✗ Regex parsing found no transactions.")
+            else:
+                logger.error("Cannot perform regex parsing because OCR text is empty.")
 
-            # Mark extraction method if not already set
-            if parsed_data and '_extraction_method' not in parsed_data:
-                parsed_data['_extraction_method'] = 'ocr'
-
+        logger.info("--- Finished Receipt Extraction ---")
         return filepath, filename_or_error, parsed_data, file_type
 
     def create_receipt_record(self, user_id, filepath, filename, transaction_id, parsed_data, file_type):

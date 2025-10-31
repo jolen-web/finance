@@ -1,26 +1,31 @@
 import os
 from pathlib import Path
-from app.db_manager import db_manager
 
 basedir = Path(__file__).parent.absolute()
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    if not SECRET_KEY:
+        raise ValueError("No SECRET_KEY set for Flask application")
 
     # Database configuration
     FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
 
-    if FLASK_ENV == 'development':
-        # For development, use a default SQLite database for operations
-        # outside of a request context (e.g., flask db migrate).
-        # The per-user database will be switched in app/__init__.py for requests.
-        db_path = basedir / 'data' / 'finance.db'
-        SQLALCHEMY_DATABASE_URI = f'sqlite:///{db_path}'
+    # Cloud SQL configuration - construct URI from environment variables
+    CLOUD_SQL_CONNECTION_NAME = os.environ.get('CLOUD_SQL_CONNECTION_NAME')
+    if CLOUD_SQL_CONNECTION_NAME:
+        # Running on Cloud Run with Cloud SQL PostgreSQL
+        DB_USER = os.environ.get('DB_USER', 'postgres')
+        DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
+        DB_NAME = os.environ.get('DB_NAME', 'finance')
+        SQLALCHEMY_DATABASE_URI = (
+            f'postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@/{DB_NAME}'
+            f'?host=/cloudsql/{CLOUD_SQL_CONNECTION_NAME}'
+        )
     else:
-        # In production, the URI is set dynamically per-request.
-        # We set a dummy value here to avoid import-time errors.
-        # CLI commands that need the DB in production will require a different setup.
-        SQLALCHEMY_DATABASE_URI = 'postgresql://dummy:dummy@dummy/dummy'
+        # Local development or explicit DATABASE_URL
+        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+            'sqlite:///' + os.path.join(str(basedir), '..', 'data', 'finance.db')
 
     # Enable dynamic query tracking
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -32,8 +37,17 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Gemini API configuration
-    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+    # Gemini API configuration (matches receipt_ocr.py which uses GOOGLE_API_KEY)
+    GEMINI_API_KEY = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
+
+    # Session security settings
+    SESSION_COOKIE_SECURE = FLASK_ENV == 'production'  # HTTPS only in production
+    SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access
+    SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours in seconds
+
+    # Request size limits (prevent DoS via large uploads)
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max request size
 
     # Application settings
     ITEMS_PER_PAGE = 50
