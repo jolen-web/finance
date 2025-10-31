@@ -52,6 +52,8 @@
         <div class="card">
             <div class="card-body">
                 <form method="POST" action="{{ url_for('financial_advisor.analyze') }}" class="row g-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                     <div class="col-md-4">
                         <label for="start_date" class="form-label">Start Date</label>
                         <input type="date" class="form-control" id="start_date" name="start_date"
@@ -99,6 +101,8 @@
                             <small class="text-muted">{{ insight.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
                         </div>
                         <form method="POST" action="{{ url_for('financial_advisor.dismiss_insight', insight_id=insight.id) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                             <button type="submit" class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-times"></i>
                             </button>
@@ -131,6 +135,8 @@
                             <small class="text-muted">{{ insight.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
                         </div>
                         <form method="POST" action="{{ url_for('financial_advisor.dismiss_insight', insight_id=insight.id) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                             <button type="submit" class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-times"></i>
                             </button>
@@ -163,6 +169,8 @@
                             <small class="text-muted">{{ insight.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
                         </div>
                         <form method="POST" action="{{ url_for('financial_advisor.dismiss_insight', insight_id=insight.id) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                             <button type="submit" class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-times"></i>
                             </button>

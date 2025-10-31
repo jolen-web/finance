@@ -130,6 +130,8 @@
                                     {% if not insight.is_dismissed %}
                                         <form method="POST" action="{{ url_for('financial_advisor.dismiss_insight', insight_id=insight.id) }}"
                                               style="display: inline;" class="ms-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                                             <button type="submit" class="btn btn-sm btn-outline-secondary">
                                                 <i class="fas fa-times"></i> Dismiss
                                             </button>

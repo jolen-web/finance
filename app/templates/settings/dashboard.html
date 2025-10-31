@@ -18,6 +18,8 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('settings.dashboard_preferences') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-check form-switch mb-3">

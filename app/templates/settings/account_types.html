@@ -31,6 +31,8 @@
                                     <strong>{{ account_type|replace('_', ' ')|title }}</strong>
                                 </span>
                                 <form method="POST" style="display: inline;" onsubmit="return confirm('Remove this account type?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="type_to_delete" value="{{ account_type }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -54,6 +56,8 @@
             </div>
             <div class="card-body">
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                     <div class="mb-3">
                         <label for="new_type" class="form-label">Account Type Name *</label>
                         <input type="text" class="form-control" id="new_type" name="new_type"

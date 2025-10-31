@@ -70,6 +70,8 @@
                 {% endif %}
 
                 <form method="POST" action="{{ url_for('ai_categorizer.train') }}" class="mt-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-sync-alt"></i> {% if model_status.is_trained %}Retrain{% else %}Train{% endif %} Model
                     </button>
@@ -87,6 +89,8 @@
                 {% if model_status.is_trained %}
                     <p>Automatically categorize uncategorized transactions using the trained model.</p>
                     <form method="POST" action="{{ url_for('ai_categorizer.auto_categorize') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                         <div class="mb-3">
                             <label for="confidence_threshold" class="form-label">Minimum Confidence</label>
                             <input type="range" class="form-range" id="confidence_threshold" name="confidence_threshold"

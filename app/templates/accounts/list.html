@@ -20,11 +20,30 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
-                <h6 class="card-title text-muted mb-2">Total Balance</h6>
-                <h2 class="{% if total_balance >= 0 %}text-success{% else %}text-danger{% endif %}">
-                    {{ total_balance|currency }}
+                <h6 class="card-title text-muted mb-2">Total Assets</h6>
+                <h2 class="text-success">
+                    {{ total_assets|currency }}
                 </h2>
-                <small class="text-muted">{{ accounts|length }} account{{ 's' if accounts|length != 1 else '' }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted mb-2">Total Liabilities</h6>
+                <h2 class="text-danger">
+                    {{ total_liabilities|currency }}
+                </h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted mb-2">Net Worth</h6>
+                <h2 class="{% if net_worth >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ net_worth|currency }}
+                </h2>
             </div>
         </div>
     </div>

@@ -188,7 +188,7 @@
                                 </td>
                                 <td>
                                     <select id="quickAddType" class="form-select form-select-sm">
-                                        <option value="expense">Expense</option>
+                                        <option value="withdrawal">Expense</option>
                                         <option value="deposit">Deposit</option>
                                     </select>
                                 </td>
@@ -218,6 +218,8 @@
                                     </td>
                                     <td>
                                         <form action="{{ url_for('transactions.toggle_cleared', id=transaction.id) }}" method="POST" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                                             <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Cleared">
                                                 {% if transaction.is_cleared %}
                                                     <i class="fas fa-check-circle text-success"></i>
@@ -227,6 +229,8 @@
                                             </button>
                                         </form>
                                         <form action="{{ url_for('transactions.toggle_reconciled', id=transaction.id) }}" method="POST" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                                             <button type="submit" class="btn btn-sm btn-link p-0" title="Toggle Reconciled">
                                                 {% if transaction.is_reconciled %}
                                                     <i class="fas fa-shield-alt text-primary"></i>
@@ -241,6 +245,8 @@
                                             <i class="fas fa-pencil-alt"></i>
                                         </a>
                                         <form action="{{ url_for('transactions.delete_transaction', id=transaction.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this transaction?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                                             <button type="submit" class="btn btn-sm btn-outline-danger">
                                                 <i class="fas fa-trash"></i>
                                             </button>

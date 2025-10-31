@@ -98,6 +98,9 @@ def create_app(config_class=Config):
     @app.template_filter('currency')
     def currency_filter(amount, show_sign=False):
         """Format amount with current currency symbol and thousands separators"""
+        if amount is None:
+            amount = 0
+
         currency_info = get_currency_info()
         symbol = currency_info['symbol']
         position = currency_info.get('position', 'before')

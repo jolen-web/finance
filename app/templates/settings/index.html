@@ -18,6 +18,8 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('settings.update') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                     <div class="mb-3">
                         <label for="currency" class="form-label">Display Currency</label>
                         <select class="form-select" id="currency" name="currency" required>
@@ -89,6 +91,8 @@
                                                 <i class="fas fa-pencil-alt"></i>
                                             </a>
                                             <form action="{{ url_for('settings.delete_category', id=category.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this category?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
@@ -113,6 +117,8 @@
                                                     <i class="fas fa-pencil-alt"></i>
                                                 </a>
                                                 <form action="{{ url_for('settings.delete_category', id=category.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this category?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
@@ -129,6 +135,8 @@
                                                                 <i class="fas fa-pencil-alt"></i>
                                                             </a>
                                                             <form action="{{ url_for('settings.delete_category', id=subcat.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this category?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                                                                 <button type="submit" class="btn btn-sm btn-link p-0 text-danger" title="Delete">
                                                                     <i class="fas fa-trash"></i>
                                                                 </button>

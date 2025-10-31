@@ -117,6 +117,8 @@
                                                 <form method="POST" action="{{ url_for('tax_assistant.untag_transaction', tag_id=tag.id) }}"
                                                       style="display: inline;"
                                                       onsubmit="return confirm('Remove this tax tag?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                                                     <button type="submit" class="btn btn-sm btn-outline-danger">
                                                         <i class="fas fa-trash"></i>
                                                     </button>

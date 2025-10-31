@@ -40,6 +40,8 @@
                 <p>Restore your financial data from a JSON backup file.</p>
 
                 <form method="POST" action="{{ url_for('backup.import_data') }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                     <div class="mb-3">
                         <label for="backup_file" class="form-label">Select Backup File</label>
                         <input type="file" class="form-control" id="backup_file" name="backup_file" accept=".json" required>
