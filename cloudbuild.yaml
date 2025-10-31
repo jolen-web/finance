@@ -22,6 +22,18 @@ steps:
       - 'push'
       - 'gcr.io/$PROJECT_ID/finance-tracker:latest'
 
+  # Run database migrations (disabled - migration job not yet created)
+  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   entrypoint: gcloud
+  #   args:
+  #     - 'run'
+  #     - 'jobs'
+  #     - 'execute'
+  #     - 'finance-tracker-migrate'
+  #     - '--region'
+  #     - 'us-central1'
+  #     - '--wait'
+
   # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -45,9 +57,9 @@ steps:
       - '--add-cloudsql-instances'
       - 'jinolen:us-central1:finance-db'
       - '--set-env-vars'
-      - 'FLASK_ENV=production,DB_USER=postgres,DB_NAME=finance,CLOUD_SQL_CONNECTION_NAME=jinolen:us-central1:finance-db,GEMINI_API_KEY=AIzaSyDUKA2cFuBE7QDIK8uH36pSHv47IfmQze0'
+      - 'FLASK_ENV=production,DB_USER=postgres,DB_NAME=finance,CLOUD_SQL_CONNECTION_NAME=jinolen:us-central1:finance-db'
       - '--update-secrets'
-      - 'DB_PASSWORD=finance-db-password:latest'
+      - 'DB_PASSWORD=finance-db-password:latest,SECRET_KEY=flask-secret-key:latest,GOOGLE_API_KEY=gemini-api-key:latest'
       - '--port'
       - '5000'
 
