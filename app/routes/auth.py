@@ -66,7 +66,7 @@ def validate_registration(username, email, password, password_confirm):
     return errors
 
 @bp.route('/register', methods=['GET', 'POST'])
-@limiter.limit("3 per hour")
+@limiter.limit("20 per hour")
 def register():
     """User registration page."""
     if current_user.is_authenticated:
@@ -108,7 +108,7 @@ def register():
     return render_template('auth/register.html')
 
 @bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per 15 minutes")
+@limiter.limit("100 per hour")
 def login():
     """User login page"""
     if current_user.is_authenticated:
