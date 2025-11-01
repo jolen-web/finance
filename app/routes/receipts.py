@@ -105,24 +105,34 @@ def bulk_import():
     try:
         # Try to get data from JSON request body
         import_data = request.get_json()
+        current_app.logger.debug(f"Bulk import request received. Import data present: {import_data is not None}")
 
         if import_data:
             # Data from AJAX request
             account_id = import_data.get('account_id')
             transactions_data = import_data.get('transactions', [])
+            current_app.logger.info(f"Processing bulk import with {len(transactions_data)} transactions for account {account_id}")
         else:
             # Fallback to session data
             pending_data = session.get('pending_import')
             if not pending_data:
+                current_app.logger.warning('No pending import data in session')
                 return jsonify({'error': 'No pending import data found'}), 400
 
             account_id = pending_data['account_id']
             transactions_data = pending_data['transactions']
+            current_app.logger.info(f"Processing bulk import from session with {len(transactions_data)} transactions for account {account_id}")
 
         if not account_id:
+            current_app.logger.error('Account ID is missing or empty')
             return jsonify({'error': 'Account ID required'}), 400
 
-        account = Account.query.get_or_404(account_id)
+        try:
+            account = Account.query.get_or_404(account_id)
+            current_app.logger.info(f"Found account: {account.name} (ID: {account_id})")
+        except Exception as e:
+            current_app.logger.error(f"Error finding account {account_id}: {str(e)}", exc_info=True)
+            return jsonify({'error': f'Account not found: {account_id}'}), 404
 
         # Verify user owns this account
         if account.user_id != current_user.id:
@@ -182,9 +192,23 @@ def bulk_import():
                 continue
 
         # Update account balance
-        account.update_balance()
+        try:
+            current_app.logger.info(f"Imported {imported_count} transactions, updating account balance...")
+            db.session.flush()  # Flush to database so update_balance can see the new transactions
+            account.update_balance()
+            current_app.logger.info(f"Account balance updated. New balance: {account.current_balance}")
+        except Exception as e:
+            current_app.logger.error(f"Error updating account balance: {str(e)}", exc_info=True)
+            db.session.rollback()
+            raise
 
-        db.session.commit()
+        try:
+            db.session.commit()
+            current_app.logger.info(f"Successfully committed {imported_count} transactions")
+        except Exception as e:
+            current_app.logger.error(f"Error committing transactions: {str(e)}", exc_info=True)
+            db.session.rollback()
+            raise
 
         # Create receipt record if we have pending receipt data (from session or request)
         receipt_data = None
