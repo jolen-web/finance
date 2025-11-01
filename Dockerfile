@@ -29,6 +29,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY . .
 
+# Make entrypoint script executable
+RUN chmod +x /app/entrypoint.sh
+
 # Expose the port Gunicorn will run on
 EXPOSE 5000
 
@@ -36,6 +39,5 @@ EXPOSE 5000
 ENV FLASK_APP="wsgi:app"
 ENV FLASK_ENV="development"
 
-# Run the application with Gunicorn
-# Using 2 workers for better concurrency and fault tolerance
-CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 8 --worker-class gevent --timeout 120 wsgi:app
+# Run migrations and start the application
+ENTRYPOINT ["/app/entrypoint.sh"]
