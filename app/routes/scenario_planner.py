@@ -28,64 +28,66 @@ def index():
 def new_scenario():
     """Create new scenario"""
     if request.method == 'POST':
-        name = request.form.get('name')
-        scenario_type = request.form.get('scenario_type')
-        duration_months = int(request.form.get('duration_months', 12))
-        description = request.form.get('description')
+        try:
+            name = request.form.get('name')
+            scenario_type = request.form.get('scenario_type')
+            duration_months = int(request.form.get('duration_months', 12))
+            description = request.form.get('description')
 
-        # Build parameters based on scenario type
-        parameters = {}
+            # Build parameters based on scenario type
+            parameters = {}
 
-        if scenario_type == 'cash_flow_forecast':
-            parameters = {
-                'monthly_income': float(request.form.get('monthly_income', 0)),
-                'income_growth_rate': float(request.form.get('income_growth_rate', 0)),
-                'monthly_expenses': float(request.form.get('monthly_expenses', 0)),
-                'expense_growth_rate': float(request.form.get('expense_growth_rate', 0)),
-                'one_time_expenses': [],
-                'one_time_income': []
-            }
+            if scenario_type == 'cash_flow_forecast':
+                parameters = {
+                    'monthly_income': float(request.form.get('monthly_income', 0)),
+                    'income_growth_rate': float(request.form.get('income_growth_rate', 0)),
+                    'monthly_expenses': float(request.form.get('monthly_expenses', 0)),
+                    'expense_growth_rate': float(request.form.get('expense_growth_rate', 0)),
+                    'one_time_expenses': [],
+                    'one_time_income': []
+                }
 
-        elif scenario_type == 'savings_goal':
-            parameters = {
-                'goal_amount': float(request.form.get('goal_amount', 0)),
-                'current_savings': float(request.form.get('current_savings', 0)),
-                'monthly_contribution': float(request.form.get('monthly_contribution', 0)),
-                'interest_rate': float(request.form.get('interest_rate', 0))
-            }
+            elif scenario_type == 'savings_goal':
+                parameters = {
+                    'goal_amount': float(request.form.get('goal_amount', 0)),
+                    'current_savings': float(request.form.get('current_savings', 0)),
+                    'monthly_contribution': float(request.form.get('monthly_contribution', 0)),
+                    'interest_rate': float(request.form.get('interest_rate', 0))
+                }
 
-        elif scenario_type == 'debt_payoff':
-            parameters = {
-                'principal': float(request.form.get('principal', 0)),
-                'annual_interest_rate': float(request.form.get('annual_interest_rate', 0)),
-                'monthly_payment': float(request.form.get('monthly_payment', 0)),
-                'extra_payments': []
-            }
+            elif scenario_type == 'debt_payoff':
+                parameters = {
+                    'principal': float(request.form.get('principal', 0)),
+                    'annual_interest_rate': float(request.form.get('annual_interest_rate', 0)),
+                    'monthly_payment': float(request.form.get('monthly_payment', 0)),
+                    'extra_payments': []
+                }
 
-        elif scenario_type == 'retirement':
-            parameters = {
-                'current_age': int(request.form.get('current_age', 30)),
-                'retirement_age': int(request.form.get('retirement_age', 65)),
-                'current_retirement_savings': float(request.form.get('current_retirement_savings', 0)),
+            elif scenario_type == 'retirement':
+                parameters = {
+                    'current_age': int(request.form.get('current_age', 30)),
+                    'retirement_age': int(request.form.get('retirement_age', 65)),
+                    'current_retirement_savings': float(request.form.get('current_retirement_savings', 0)),
                 'monthly_contribution': float(request.form.get('monthly_contribution', 0)),
                 'employer_match_pct': float(request.form.get('employer_match_pct', 0)),
                 'annual_return': float(request.form.get('annual_return', 7))
             }
 
-        elif scenario_type == 'what_if':
-            parameters = {
-                'baseline_income': float(request.form.get('baseline_income', 0)),
-                'baseline_expenses': float(request.form.get('baseline_expenses', 0)),
-                'income_change_pct': float(request.form.get('income_change_pct', 0)),
-                'expense_change_pct': float(request.form.get('expense_change_pct', 0)),
-                'new_expense_amount': float(request.form.get('new_expense_amount', 0)),
-                'new_expense_name': request.form.get('new_expense_name', '')
-            }
+            elif scenario_type == 'what_if':
+                parameters = {
+                    'baseline_income': float(request.form.get('baseline_income', 0)),
+                    'baseline_expenses': float(request.form.get('baseline_expenses', 0)),
+                    'income_change_pct': float(request.form.get('income_change_pct', 0)),
+                    'expense_change_pct': float(request.form.get('expense_change_pct', 0)),
+                    'new_expense_amount': float(request.form.get('new_expense_amount', 0)),
+                    'new_expense_name': request.form.get('new_expense_name', '')
+                }
 
-        try:
             scenario = create_scenario(name, scenario_type, duration_months, parameters, description)
             flash(f'Scenario "{name}" created successfully!', 'success')
             return redirect(url_for('scenario_planner.view_scenario', scenario_id=scenario.id))
+        except (ValueError, TypeError):
+            flash('Invalid numeric values provided. Please check your input.', 'danger')
         except Exception as e:
             flash(f'Error creating scenario: {str(e)}', 'danger')
 

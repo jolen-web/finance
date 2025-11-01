@@ -42,10 +42,15 @@ def new_investment():
         ticker = request.form.get('ticker')
         investment_type = request.form.get('investment_type')
         category_id = request.form.get('category_id') or None
-        quantity = float(request.form.get('quantity', 0))
-        purchase_price = float(request.form.get('purchase_price', 0))
-        current_price = request.form.get('current_price')
-        current_price = float(current_price) if current_price else None
+
+        try:
+            quantity = float(request.form.get('quantity', 0))
+            purchase_price = float(request.form.get('purchase_price', 0))
+            current_price = request.form.get('current_price')
+            current_price = float(current_price) if current_price else None
+        except (ValueError, TypeError):
+            flash('Invalid quantity, price, or current price values.', 'danger')
+            return redirect(url_for('investments.new_investment'))
         purchase_date_str = request.form.get('purchase_date')
         account_id = request.form.get('account_id') or None
         notes = request.form.get('notes')
@@ -93,15 +98,22 @@ def edit_investment(id):
     accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
 
     if request.method == 'POST':
+        try:
+            quantity = float(request.form.get('quantity', 0))
+            purchase_price = float(request.form.get('purchase_price', 0))
+            current_price = request.form.get('current_price')
+            current_price = float(current_price) if current_price else None
+        except (ValueError, TypeError):
+            flash('Invalid quantity, price, or current price values.', 'danger')
+            return redirect(url_for('investments.edit_investment', id=id))
+
         investment.name = request.form.get('name')
         investment.ticker = request.form.get('ticker')
         investment.investment_type = request.form.get('investment_type')
         investment.category_id = request.form.get('category_id') or None
-        investment.quantity = float(request.form.get('quantity', 0))
-        investment.purchase_price = float(request.form.get('purchase_price', 0))
-
-        current_price = request.form.get('current_price')
-        investment.current_price = float(current_price) if current_price else None
+        investment.quantity = quantity
+        investment.purchase_price = purchase_price
+        investment.current_price = current_price
 
         if investment.current_price:
             investment.current_value = investment.current_price * investment.quantity

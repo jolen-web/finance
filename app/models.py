@@ -47,25 +47,42 @@ class Account(db.Model):
 
     def update_balance(self):
         """Calculate current balance based on starting balance and all transactions"""
+        from sqlalchemy import func, case
+
         total = self.starting_balance
 
-        for transaction in self.transactions:
-            if self.account_type == 'credit_card':
-                # For credit cards, balance represents debt (positive = money owed)
-                # Charges (withdrawals) increase debt, payments (deposits) decrease debt
-                if transaction.transaction_type == 'withdrawal':
-                    # Charge/purchase increases debt
-                    total += transaction.amount
-                elif transaction.transaction_type == 'deposit':
-                    # Payment decreases debt
-                    total -= transaction.amount
-            else:
-                # For checking, savings, cash accounts: standard logic
-                # Deposits increase balance, withdrawals decrease balance
-                if transaction.transaction_type == 'deposit':
-                    total += transaction.amount
-                elif transaction.transaction_type == 'withdrawal' or transaction.transaction_type == 'transfer':
-                    total -= transaction.amount
+        if self.account_type == 'credit_card':
+            # For credit cards, use SQL aggregation with conditional logic
+            # Charges (withdrawals) increase debt, payments (deposits) decrease debt
+            result = db.session.query(
+                func.sum(
+                    case(
+                        (Transaction.transaction_type == 'withdrawal', Transaction.amount),
+                        (Transaction.transaction_type == 'deposit', -Transaction.amount),
+                        else_=0
+                    )
+                )
+            ).filter(Transaction.account_id == self.id).scalar()
+            if result:
+                total += result
+        else:
+            # For checking, savings, cash accounts: standard logic
+            # Calculate deposits - withdrawals/transfers using SQL aggregation
+            deposits = db.session.query(
+                func.sum(Transaction.amount)
+            ).filter(
+                Transaction.account_id == self.id,
+                Transaction.transaction_type == 'deposit'
+            ).scalar() or 0
+
+            withdrawals = db.session.query(
+                func.sum(Transaction.amount)
+            ).filter(
+                Transaction.account_id == self.id,
+                Transaction.transaction_type.in_(['withdrawal', 'transfer'])
+            ).scalar() or 0
+
+            total = self.starting_balance + deposits - withdrawals
 
         self.current_balance = total
         return self.current_balance
@@ -327,9 +344,10 @@ class DashboardPreferences(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     show_accounts = db.Column(db.Boolean, default=True)
     show_transactions = db.Column(db.Boolean, default=True)
-    show_investments = db.Column(db.Boolean, default=True)
-    show_assets = db.Column(db.Boolean, default=True)
+    show_investments = db.Column(db.Boolean, default=False)
+    show_assets = db.Column(db.Boolean, default=False)
     show_receipts = db.Column(db.Boolean, default=True)
+    default_page = db.Column(db.String(50), default='dashboard')  # dashboard, accounts, transactions, etc.
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -371,3 +389,22 @@ class RegexPattern(db.Model):
 
     def __repr__(self):
         return f'<RegexPattern {self.pattern}>'
+
+
+class Feedback(db.Model):
+    __tablename__ = 'feedback'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    feedback_type = db.Column(db.String(20), nullable=False)  # bug, feature, improvement, other
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), default='open')  # open, in_progress, resolved, closed
+    priority = db.Column(db.String(20), default='medium')  # low, medium, high, critical
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship('User', backref='feedback_items')
+
+    def __repr__(self):
+        return f'<Feedback {self.title}>'

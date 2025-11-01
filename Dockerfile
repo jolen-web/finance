@@ -32,9 +32,9 @@ COPY . .
 # Expose the port Gunicorn will run on
 EXPOSE 5000
 
-# Set environment variables
+# Set environment variables (can be overridden by docker-compose)
 ENV FLASK_APP="wsgi:app"
-ENV FLASK_ENV="production"
+ENV FLASK_ENV="development"
 
 # Run the application with Gunicorn
 # Using 2 workers for better concurrency and fault tolerance

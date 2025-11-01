@@ -29,6 +29,7 @@ services:
       - DATABASE_URL=postgresql://postgres:mysecretpassword@db:5432/finance_db
       - SECRET_KEY=a-very-secret-key-for-development
       - FLASK_APP=run.py
+      - FLASK_ENV=development
     depends_on:
       db:
         condition: service_healthy

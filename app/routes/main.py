@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, jsonify
+from flask import Blueprint, render_template, redirect, url_for, jsonify, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import text
 from app.models import DashboardPreferences
@@ -6,6 +6,31 @@ from app import db
 from app.services.dashboard import DashboardService
 
 bp = Blueprint('main', __name__)
+
+@bp.route('/')
+def index():
+    """Root route - shows homepage for guests, dashboard for authenticated users"""
+    if current_user.is_authenticated:
+        # Redirect authenticated users to dashboard
+        return dashboard()
+    else:
+        # Show homepage for unauthenticated users
+        return render_template('homepage.html', config=current_app.config)
+
+def dashboard():
+    """Dashboard view showing account summary and recent transactions"""
+    # Get dashboard data from the service layer
+    service = DashboardService(user_id=current_user.id)
+    dashboard_data = service.get_net_worth_data()
+
+    # Get or create dashboard preferences for user
+    prefs = DashboardPreferences.query.filter_by(user_id=current_user.id).first()
+    if not prefs:
+        prefs = DashboardPreferences(user_id=current_user.id)
+        db.session.add(prefs)
+        db.session.commit()
+
+    return render_template('dashboard.html', **dashboard_data, prefs=prefs)
 
 @bp.route('/health')
 def health():
@@ -27,20 +52,3 @@ def health():
             'error': str(e),
             'database': 'disconnected'
         }), 503
-
-@bp.route('/')
-@login_required
-def index():
-    """Dashboard view showing account summary and recent transactions"""
-    # Get dashboard data from the service layer
-    service = DashboardService(user_id=current_user.id)
-    dashboard_data = service.get_net_worth_data()
-
-    # Get or create dashboard preferences for user
-    prefs = DashboardPreferences.query.filter_by(user_id=current_user.id).first()
-    if not prefs:
-        prefs = DashboardPreferences(user_id=current_user.id)
-        db.session.add(prefs)
-        db.session.commit()
-
-    return render_template('dashboard.html', **dashboard_data, prefs=prefs)

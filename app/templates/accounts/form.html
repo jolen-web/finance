@@ -19,11 +19,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="account_type" class="form-label">Account Type *
-                            <a href="{{ url_for('settings.account_types') }}" class="btn btn-sm btn-outline-secondary" style="float: right;">
-                                <i class="fas fa-cog"></i> Manage Types
-                            </a>
-                        </label>
+                        <label for="account_type" class="form-label">Account Type *</label>
                         <select class="form-select" id="account_type" name="account_type" required>
                             <option value="">Select account type...</option>
                             <option value="checking" {% if account and account.account_type == 'checking' %}selected{% endif %}>Checking</option>

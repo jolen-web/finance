@@ -57,8 +57,7 @@ def create_app(config_class=Config):
         return User.query.get(int(user_id))
 
     # Register blueprints
-    from app.routes import main, accounts, transactions, categories, backup, backup_view, settings, receipts, ai_categorizer, financial_advisor, tax_assistant, scenario_planner, investments, auth, assets, diag
-    from app.routes import migrate as migrate_routes
+    from app.routes import main, accounts, transactions, categories, backup, backup_view, settings, receipts, ai_categorizer, financial_advisor, tax_assistant, scenario_planner, investments, auth, assets, diag, feedback
     app.register_blueprint(main.bp)
     app.register_blueprint(accounts.bp)
     app.register_blueprint(transactions.bp)
@@ -75,7 +74,7 @@ def create_app(config_class=Config):
     app.register_blueprint(auth.bp)
     app.register_blueprint(assets.bp)
     app.register_blueprint(diag.bp)
-    app.register_blueprint(migrate_routes.bp)
+    app.register_blueprint(feedback.feedback_bp)
 
     # Ensure data directory exists
     import os
@@ -144,8 +143,9 @@ def create_app(config_class=Config):
                     db.session.commit()
                 return {'prefs': prefs}
         except Exception as e:
+            db.session.rollback()
             import logging
-            logging.error(f"Error in inject_dashboard_prefs: {e}")
+            logging.error(f"Error in inject_dashboard_prefs: {e}", exc_info=True)
         return {'prefs': None}
 
     # Register error handlers

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from app.models import Account, Transaction
-from app import db
+from app import db, limiter
 
 bp = Blueprint('accounts', __name__, url_prefix='/accounts')
 
@@ -29,6 +29,7 @@ def list_accounts():
 
 @bp.route('/new', methods=['GET', 'POST'])
 @login_required
+@limiter.limit("20 per hour")
 def new_account():
     """Create new account"""
     if request.method == 'POST':
@@ -65,15 +66,22 @@ def new_account():
 
 @bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
+@limiter.limit("20 per hour")
 def edit_account(id):
     """Edit existing account"""
     account = Account.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
+        try:
+            starting_balance = float(request.form.get('starting_balance', 0))
+        except (ValueError, TypeError):
+            flash('Starting balance must be a valid number.', 'danger')
+            return redirect(url_for('accounts.edit_account', id=id))
+
         account.name = request.form.get('name')
         account.account_type = request.form.get('account_type')
         old_starting = account.starting_balance
-        account.starting_balance = float(request.form.get('starting_balance', 0))
+        account.starting_balance = starting_balance
 
         # Update current balance if starting balance changed
         if old_starting != account.starting_balance:
@@ -87,6 +95,7 @@ def edit_account(id):
     return render_template('accounts/form.html', account=account)
 
 @bp.route('/<int:id>/delete', methods=['POST'])
+@limiter.limit("20 per hour")
 @login_required
 def delete_account(id):
     """Delete account"""

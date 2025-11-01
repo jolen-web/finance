@@ -3,61 +3,88 @@
 {% block title %}Dashboard - Finance Tracker{% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row mb-4">
     <div class="col-12">
-        <h1 class="mb-4">Dashboard</h1>
+        <h1>Dashboard</h1>
+        <p class="text-secondary">Welcome back! Here's your financial overview.</p>
     </div>
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card text-white bg-success">
+    <div class="col-md-4 mb-3">
+        <div class="metric-card">
+            <div class="metric-label">
+                <i class="fas fa-wallet" style="margin-right: 0.5rem;"></i>Total Assets
+            </div>
+            <div class="metric-value positive">{{ total_assets|currency }}</div>
+            <div class="metric-change">Checking, Savings, Cash</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="metric-card">
+            <div class="metric-label">
+                <i class="fas fa-credit-card" style="margin-right: 0.5rem;"></i>Total Liabilities
+            </div>
+            <div class="metric-value negative">{{ total_liabilities|currency }}</div>
+            <div class="metric-change">Credit Cards & Loans</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="metric-card">
+            <div class="metric-label">
+                <i class="fas fa-chart-pie" style="margin-right: 0.5rem;"></i>Net Worth
+            </div>
+            <div class="metric-value {% if net_worth >= 0 %}positive{% else %}negative{% endif %}">{{ net_worth|currency }}</div>
+            <div class="metric-change">Assets - Liabilities</div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="row mb-4">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line" style="margin-right: 0.5rem;"></i>Income vs Expenses</h5>
+            </div>
             <div class="card-body">
-                <h5 class="card-title">Total Assets</h5>
-                <h2 class="card-text">{{ total_assets|currency }}</h2>
-                <small>Checking, Savings, Cash</small>
+                <canvas id="incomeExpenseChart" style="max-height: 300px;"></canvas>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card text-white bg-danger">
-            <div class="card-body">
-                <h5 class="card-title">Total Liabilities</h5>
-                <h2 class="card-text">{{ total_liabilities|currency }}</h2>
-                <small>Credit Cards</small>
+
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-pie" style="margin-right: 0.5rem;"></i>Spending by Category</h5>
             </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-white bg-primary">
             <div class="card-body">
-                <h5 class="card-title">Net Worth</h5>
-                <h2 class="card-text">{{ net_worth|currency }}</h2>
-                <small>Assets - Liabilities</small>
+                <canvas id="categoryChart" style="max-height: 300px;"></canvas>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Account Balances & Transactions -->
 {% if prefs.show_accounts %}
 <div class="row mb-4">
-    <div class="col-md-6">
+    <div class="col-lg-4 mb-4">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Accounts</h5>
-                <a href="{{ url_for('accounts.new_account') }}" class="btn btn-sm btn-primary">
-                    <i class="fas fa-plus"></i> Add Account
+                <h5 class="mb-0"><i class="fas fa-landmark" style="margin-right: 0.5rem;"></i>Accounts</h5>
+                <a href="{{ url_for('accounts.new_account') }}" class="btn btn-sm btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.875rem;">
+                    <i class="fas fa-plus"></i>
                 </a>
             </div>
             <div class="card-body">
                 {% if accounts %}
                     <div class="list-group list-group-flush">
                         {% for account in accounts %}
-                            <a href="{{ url_for('accounts.view_account', id=account.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <a href="{{ url_for('accounts.view_account', id=account.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" style="border: none; padding: 1rem 0; border-bottom: 1px solid var(--border-color);">
                                 <div>
-                                    <strong>{{ account.name }}</strong>
+                                    <strong style="font-size: 0.95rem;">{{ account.name }}</strong>
                                     <br>
-                                    <small class="text-muted">{{ account.account_type|replace('_', ' ')|title }}</small>
+                                    <small style="color: var(--text-tertiary);">{{ account.account_type|replace('_', ' ')|title }}</small>
                                 </div>
                                 <span class="badge {% if account.current_balance >= 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
                                     {{ account.current_balance|currency }}
@@ -66,46 +93,54 @@
                         {% endfor %}
                     </div>
                 {% else %}
-                    <p class="text-muted">No accounts yet. <a href="{{ url_for('accounts.new_account') }}">Create your first account</a></p>
+                    <div class="empty-state" style="padding: 2rem 1rem;">
+                        <div class="empty-state-icon"><i class="fas fa-inbox"></i></div>
+                        <p class="text-muted">No accounts yet</p>
+                        <a href="{{ url_for('accounts.new_account') }}" class="btn btn-sm btn-primary">Create Account</a>
+                    </div>
                 {% endif %}
             </div>
         </div>
     </div>
 
     {% if prefs.show_transactions %}
-    <div class="col-md-6">
+    <div class="col-lg-8">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Recent Transactions</h5>
-                <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-sm btn-primary">
-                    <i class="fas fa-plus"></i> Add Transaction
+                <h5 class="mb-0"><i class="fas fa-list" style="margin-right: 0.5rem;"></i>Recent Transactions</h5>
+                <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-sm btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.875rem;">
+                    <i class="fas fa-plus"></i> Add
                 </a>
             </div>
             <div class="card-body">
                 {% if recent_transactions %}
                     <div class="list-group list-group-flush">
                         {% for transaction in recent_transactions %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>{{ transaction.payee }}</strong>
+                            <div class="list-group-item d-flex justify-content-between align-items-center" style="border: none; padding: 1rem 0; border-bottom: 1px solid var(--border-color);">
+                                <div style="flex: 1;">
+                                    <strong style="font-size: 0.95rem;">{{ transaction.payee }}</strong>
                                     <br>
-                                    <small class="text-muted">
-                                        {{ transaction.date.strftime('%Y-%m-%d') }} - {{ transaction.account.name }}
+                                    <small style="color: var(--text-tertiary);">
+                                        {{ transaction.date.strftime('%Y-%m-%d') }}
                                         {% if transaction.is_cleared %}<i class="fas fa-check-circle text-success"></i>{% endif %}
                                         {% if transaction.is_reconciled %}<i class="fas fa-shield-alt text-primary"></i>{% endif %}
                                     </small>
                                 </div>
-                                <span class="{% if transaction.transaction_type == 'deposit' %}text-success{% else %}text-danger{% endif %}">
+                                <span class="{% if transaction.transaction_type == 'deposit' %}text-success{% else %}text-danger{% endif %}" style="font-weight: 600; min-width: 80px; text-align: right;">
                                     {{ transaction.amount|currency(true) if transaction.transaction_type == 'deposit' else (-transaction.amount)|currency }}
                                 </span>
                             </div>
                         {% endfor %}
                     </div>
                     <div class="text-center mt-3">
-                        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-sm btn-outline-primary">View All Transactions</a>
+                        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-sm btn-outline-primary">View All</a>
                     </div>
                 {% else %}
-                    <p class="text-muted">No transactions yet. <a href="{{ url_for('transactions.new_transaction') }}">Add your first transaction</a></p>
+                    <div class="empty-state" style="padding: 2rem 1rem;">
+                        <div class="empty-state-icon"><i class="fas fa-inbox"></i></div>
+                        <p class="text-muted">No transactions yet</p>
+                        <a href="{{ url_for('transactions.new_transaction') }}" class="btn btn-sm btn-primary">Add Transaction</a>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -113,4 +148,83 @@
     {% endif %}
 </div>
 {% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Wait for Chart.js to load, then initialize charts
+  function initCharts() {
+    if (!window.chartManager || !window.chartManager.scriptLoaded) {
+      setTimeout(initCharts, 100);
+      return;
+    }
+
+    // Income vs Expense Chart
+    const incomeExpenseCanvas = document.getElementById('incomeExpenseChart');
+    if (incomeExpenseCanvas) {
+      window.chartManager.createLineChart('incomeExpenseChart', {
+        labels: [],
+        datasets: [
+          {
+            label: 'Income',
+            data: [],
+            borderColor: 'rgba(16, 185, 129, 1)',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+          },
+          {
+            label: 'Expenses',
+            data: [],
+            borderColor: 'rgba(239, 68, 68, 1)',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+          }
+        ]
+      }, {
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return '$' + value.toFixed(0);
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Spending by Category Chart
+    const categoryCanvas = document.getElementById('categoryChart');
+    if (categoryCanvas) {
+      window.chartManager.createDoughnutChart('categoryChart', {
+        labels: [],
+        datasets: [
+          {
+            data: [],
+            backgroundColor: [
+              'rgba(37, 99, 235, 0.8)',
+              'rgba(239, 68, 68, 0.8)',
+              'rgba(16, 185, 129, 0.8)',
+              'rgba(245, 158, 11, 0.8)',
+              'rgba(6, 182, 212, 0.8)',
+              'rgba(139, 92, 246, 0.8)',
+            ],
+            borderColor: 'var(--bg-primary)',
+            borderWidth: 2,
+          }
+        ]
+      });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', initCharts);
+  // Also initialize when charts library loads
+  window.addEventListener('chartsLoaded', initCharts);
+</script>
 {% endblock %}

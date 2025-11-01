@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Feedback - {{ config.APP_NAME }} v{{ config.APP_VERSION }} {{ config.APP_VERSION_STAGE|title }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <h1 class="mb-0"><i class="fas fa-comment-dots"></i> Submit Feedback</h1>
+            <span class="badge bg-warning text-dark" style="font-size: 0.9rem; padding: 8px 12px;">
+                <i class="fas fa-flask-vial"></i> Beta v{{ config.APP_VERSION }}
+            </span>
+        </div>
+        <p class="text-secondary">Help us improve Finance Tracker by sharing your thoughts and experiences</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 offset-lg-2">
+        <!-- Beta Notice -->
+        <div class="alert alert-info border-info-subtle mb-4" style="background-color: rgba(13, 110, 253, 0.1);">
+            <div class="d-flex align-items-start gap-3">
+                <i class="fas fa-flask-vial" style="font-size: 1.3rem; color: #0d6efd; margin-top: 2px;"></i>
+                <div>
+                    <h5 class="alert-heading mb-2">{{ config.APP_NAME }} v{{ config.APP_VERSION }} - {{ config.APP_VERSION_STAGE|title }} Release</h5>
+                    <p class="mb-0">
+                        We're currently in beta with new features rolling out regularly. Your feedback is invaluable in helping us refine the platform.
+                        This is a <strong>production-grade application</strong> with enterprise-level security—all your data is encrypted with bank-grade
+                        encryption and follows strict compliance standards.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Notice -->
+        <div class="alert alert-success border-success-subtle mb-4" style="background-color: rgba(25, 135, 84, 0.1);">
+            <div class="d-flex align-items-start gap-3">
+                <i class="fas fa-shield-alt" style="font-size: 1.3rem; color: #198754; margin-top: 2px;"></i>
+                <div>
+                    <h5 class="alert-heading mb-2">🔒 Your Data is Secure</h5>
+                    <p class="mb-0">
+                        This feedback form is protected with CSRF tokens and rate limiting. All submissions are encrypted in transit and at rest.
+                        Your privacy is our priority—we never share your personal information.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-edit"></i> Feedback Form</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" data-ajax>
+                    <div class="mb-4">
+                        <label for="feedback_type" class="form-label">Feedback Type <span class="text-danger">*</span></label>
+                        <select name="feedback_type" id="feedback_type" class="form-select" required>
+                            <option value="">Select a type...</option>
+                            <option value="bug">🐛 Bug Report</option>
+                            <option value="feature">✨ Feature Request</option>
+                            <option value="improvement">📈 Improvement</option>
+                            <option value="other">💬 Other</option>
+                        </select>
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="title" class="form-label">Title *</label>
+                        <input type="text" name="title" id="title" class="form-control" placeholder="Brief title of your feedback" required>
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="description" class="form-label">Description *</label>
+                        <textarea name="description" id="description" class="form-control" rows="6" placeholder="Please provide detailed feedback..." required></textarea>
+                        <small class="text-muted">Include steps to reproduce if it's a bug, or explain your feature request clearly</small>
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="priority" class="form-label">Priority</label>
+                        <select name="priority" id="priority" class="form-select">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                        <small class="text-muted">How urgent is this feedback?</small>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-paper-plane"></i> Submit Feedback
+                        </button>
+                        <a href="{{ url_for('feedback.list_feedback') }}" class="btn btn-outline-secondary btn-lg">
+                            View My Feedback
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tips section -->
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-lightbulb"></i> How to Write Great Feedback</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Your feedback helps us build a better product. Here's how to make it most impactful:</p>
+                <ul class="mb-0">
+                    <li><strong>✓ Be Specific:</strong> The more details you provide, the faster we can address it</li>
+                    <li><strong>✓ For Bugs:</strong> Include steps to reproduce, what you expected, and what actually happened</li>
+                    <li><strong>✓ For Features:</strong> Explain the use case and why it would benefit your workflow</li>
+                    <li><strong>✓ Browser/Device:</strong> Mention your device or browser if it's relevant</li>
+                    <li><strong>✓ Screenshots:</strong> If applicable, describe what you see or what's missing</li>
+                </ul>
+                <hr class="my-3">
+                <p class="text-muted small mb-0">
+                    <i class="fas fa-info-circle"></i> All feedback is reviewed by our development team within 48 hours.
+                    You can track the status of your submissions at any time.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

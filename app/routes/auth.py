@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from urllib.parse import urlparse, urljoin
-from app.models import User
+from app.models import User, DashboardPreferences
 from app import db, db_manager, limiter
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -146,10 +146,31 @@ def login():
         login_user(user, remember=remember_me)
         flash(f'Welcome back, {user.username}!', 'success')
 
-        # Redirect to next page or dashboard (with open redirect protection)
+        # Redirect to next page or user's default page (with open redirect protection)
         next_page = request.args.get('next')
         if not next_page or not is_safe_url(next_page):
-            next_page = url_for('main.index')
+            # Get user's default page preference
+            prefs = DashboardPreferences.query.filter_by(user_id=user.id).first()
+            default_page = prefs.default_page if prefs else 'dashboard'
+
+            # Map default_page to route names
+            page_routes = {
+                'dashboard': 'main.index',
+                'accounts': 'accounts.list_accounts',
+                'transactions': 'transactions.list_transactions',
+                'assets': 'assets.list_assets',
+                'investments': 'investments.index',
+                'receipts': 'receipts.index',
+                'feedback': 'feedback.list_feedback'
+            }
+
+            # Validate that the route exists, fallback to dashboard if not
+            route_name = page_routes.get(default_page, 'main.index')
+            try:
+                next_page = url_for(route_name)
+            except Exception:
+                # Route doesn't exist, fallback to dashboard
+                next_page = url_for('main.index')
 
         return redirect(next_page)
 

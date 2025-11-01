@@ -53,6 +53,12 @@ class Config:
     ITEMS_PER_PAGE = 50
     DATE_FORMAT = '%Y-%m-%d'
 
+    # Version information
+    APP_VERSION = '2.0.0'
+    APP_VERSION_STAGE = 'beta'  # beta, alpha, rc, stable
+    APP_NAME = 'Finance Tracker'
+    APP_DESCRIPTION = 'Smart Personal Finance Management'
+
     # Currency settings
     CURRENCIES = {
         'USD': {'symbol': '$', 'name': 'US Dollar', 'position': 'before'},

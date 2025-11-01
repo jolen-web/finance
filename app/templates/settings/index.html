@@ -60,12 +60,67 @@
 
         <div class="card mt-4">
             <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-home"></i> Default Landing Page</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('settings.update') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                    <div class="mb-3">
+                        <label for="default_page" class="form-label">Select Your Default Page</label>
+                        <select class="form-select" id="default_page" name="default_page" required>
+                            <option value="dashboard" {% if prefs and prefs.default_page == 'dashboard' %}selected{% endif %}>
+                                <i class="fas fa-chart-line"></i> Dashboard
+                            </option>
+                            <option value="accounts" {% if prefs and prefs.default_page == 'accounts' %}selected{% endif %}>
+                                <i class="fas fa-university"></i> Accounts
+                            </option>
+                            <option value="transactions" {% if prefs and prefs.default_page == 'transactions' %}selected{% endif %}>
+                                <i class="fas fa-list"></i> Transactions
+                            </option>
+                            <option value="assets" {% if prefs and prefs.default_page == 'assets' %}selected{% endif %}>
+                                <i class="fas fa-home"></i> Assets
+                            </option>
+                            <option value="investments" {% if prefs and prefs.default_page == 'investments' %}selected{% endif %}>
+                                <i class="fas fa-chart-line"></i> Investments
+                            </option>
+                            <option value="receipts" {% if prefs and prefs.default_page == 'receipts' %}selected{% endif %}>
+                                <i class="fas fa-receipt"></i> Receipts
+                            </option>
+                            <option value="feedback" {% if prefs and prefs.default_page == 'feedback' %}selected{% endif %}>
+                                <i class="fas fa-comment-dots"></i> Feedback
+                            </option>
+                        </select>
+                        <small class="form-text text-muted">This page will be displayed when you log in.</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Default Page
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-list-check"></i> Account Type Management</h5>
             </div>
             <div class="card-body">
                 <p>Customize your account types to fit your financial setup.</p>
                 <a href="{{ url_for('settings.account_types') }}" class="btn btn-primary">
                     <i class="fas fa-cog"></i> Manage Account Types
+                </a>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-filter"></i> Regex Patterns</h5>
+            </div>
+            <div class="card-body">
+                <p>Create custom regex patterns for automatic transaction categorization.</p>
+                <a href="{{ url_for('settings.regex_patterns') }}" class="btn btn-primary">
+                    <i class="fas fa-cog"></i> Manage Regex Patterns
                 </a>
             </div>
         </div>

@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import current_user, login_required
 from app.models import Transaction, Account, Category, RegexPattern
-from app import db
+from app import db, limiter
 from datetime import datetime
 
 def learn_regex_from_payee(payee, user_id, account_type):
@@ -64,17 +64,23 @@ def list_transactions():
 
 @bp.route('/new', methods=['GET', 'POST'])
 @login_required
+@limiter.limit("30 per hour")
 def new_transaction():
     """Create new transaction"""
     if request.method == 'POST':
         date_str = request.form.get('date')
-        amount = float(request.form.get('amount'))
         payee = request.form.get('payee')
         memo = request.form.get('memo', '')
         transaction_type = request.form.get('transaction_type')
-        account_id = int(request.form.get('account_id'))
         category_id = request.form.get('category_id')
-        category_id = int(category_id) if category_id else None
+
+        try:
+            amount = float(request.form.get('amount'))
+            account_id = int(request.form.get('account_id'))
+            category_id = int(category_id) if category_id else None
+        except (ValueError, TypeError):
+            flash('Invalid amount or account selection', 'danger')
+            return render_template('transactions/form.html', transaction=None)
 
         try:
             transaction = Transaction(
@@ -118,20 +124,26 @@ def new_transaction():
 
 @bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
+@limiter.limit("30 per hour")
 def edit_transaction(id):
     """Edit existing transaction"""
     transaction = Transaction.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
-        date_str = request.form.get('date')
-        transaction.date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        transaction.amount = float(request.form.get('amount'))
+        try:
+            date_str = request.form.get('date')
+            transaction.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            transaction.amount = float(request.form.get('amount'))
+            transaction.account_id = int(request.form.get('account_id'))
+            category_id = request.form.get('category_id')
+        except (ValueError, TypeError):
+            flash('Invalid amount or account selection', 'danger')
+            return redirect(url_for('transactions.edit_transaction', id=id))
+
         transaction.payee = request.form.get('payee')
         transaction.memo = request.form.get('memo', '')
         transaction.transaction_type = request.form.get('transaction_type')
         old_account_id = transaction.account_id
-        transaction.account_id = int(request.form.get('account_id'))
-        category_id = request.form.get('category_id')
         transaction.category_id = int(category_id) if category_id else None
 
         # Update balances for affected accounts

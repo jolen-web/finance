@@ -46,18 +46,23 @@ def index():
 
     categories = Category.query.filter_by(user_id=current_user.id).order_by(Category.name).all()
 
+    # Get user's dashboard preferences
+    prefs = DashboardPreferences.query.filter_by(user_id=current_user.id).first()
+
     try:
         return render_template('settings/index.html',
                              settings=settings,
                              currencies=currencies,
                              current_currency=current_currency,
-                             categories=categories)
+                             categories=categories,
+                             prefs=prefs)
     except Exception as e:
         current_app.logger.error(f"Error rendering settings index: {e}", exc_info=True)
         flash('An error occurred while loading the settings page.', 'danger')
         return redirect(url_for('main.index'))
 
 @bp.route('/update', methods=['POST'])
+@login_required
 def update():
     """Update settings"""
     settings = load_settings()
@@ -71,9 +76,25 @@ def update():
     else:
         flash('Invalid currency selection', 'danger')
 
+    # Update default page
+    new_default_page = request.form.get('default_page')
+    if new_default_page:
+        valid_pages = ['dashboard', 'accounts', 'transactions', 'assets', 'investments', 'receipts', 'feedback']
+        if new_default_page in valid_pages:
+            prefs = DashboardPreferences.query.filter_by(user_id=current_user.id).first()
+            if prefs:
+                prefs.default_page = new_default_page
+                db.session.commit()
+                flash(f'Default page updated to {new_default_page.capitalize()}', 'success')
+            else:
+                flash('User preferences not found', 'danger')
+        else:
+            flash('Invalid page selection', 'danger')
+
     return redirect(url_for('settings.index'))
 
 @bp.route('/account-types', methods=['GET', 'POST'])
+@login_required
 def account_types():
     """Manage custom account types"""
     settings = load_settings()
@@ -110,6 +131,7 @@ def account_types():
     return render_template('settings/account_types.html', account_types=settings['account_types'])
 
 @bp.route('/categories/new', methods=['GET', 'POST'])
+@login_required
 def new_category():
     """Create a new category from settings"""
     if request.method == 'POST':
@@ -122,8 +144,8 @@ def new_category():
             flash('Category name is required', 'danger')
             return redirect(url_for('settings.index'))
 
-        # Check if category name already exists
-        existing = Category.query.filter_by(name=name).first()
+        # Check if category name already exists for this user
+        existing = Category.query.filter_by(name=name, user_id=current_user.id).first()
         if existing:
             flash('Category with this name already exists', 'danger')
             return redirect(url_for('settings.index'))
@@ -139,6 +161,7 @@ def new_category():
     return render_template('settings/category_form.html', category=None, categories=categories)
 
 @bp.route('/categories/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_category(id):
     category = Category.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
@@ -152,8 +175,8 @@ def edit_category(id):
             flash('Category name is required', 'danger')
             return redirect(url_for('settings.index'))
 
-        # Check if another category has the same name
-        existing = Category.query.filter_by(name=name).filter(Category.id != id).first()
+        # Check if another category has the same name for this user
+        existing = Category.query.filter_by(name=name, user_id=current_user.id).filter(Category.id != id).first()
         if existing:
             flash('Category with this name already exists', 'danger')
             return redirect(url_for('settings.index'))
@@ -170,6 +193,7 @@ def edit_category(id):
     return render_template('settings/category_form.html', category=category, categories=categories)
 
 @bp.route('/categories/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_category(id):
     """Delete a category from settings"""
     category = Category.query.filter_by(id=id, user_id=current_user.id).first_or_404()
@@ -228,8 +252,13 @@ def regex_patterns():
             pattern_id = request.form.get('pattern_id')
             pattern_str = request.form.get('pattern').strip()
             account_type = request.form.get('account_type')
-            confidence_score = float(request.form.get('confidence_score', 0.5))
-            
+
+            try:
+                confidence_score = float(request.form.get('confidence_score', 0.5))
+            except (ValueError, TypeError):
+                flash('Confidence score must be a valid number.', 'danger')
+                return redirect(url_for('settings.regex_patterns'))
+
             if not pattern_str:
                 flash('Regex pattern cannot be empty.', 'danger')
                 return redirect(url_for('settings.regex_patterns'))
