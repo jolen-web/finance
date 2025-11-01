@@ -57,7 +57,8 @@ def create_app(config_class=Config):
         return User.query.get(int(user_id))
 
     # Register blueprints
-    from app.routes import main, accounts, transactions, categories, backup, backup_view, settings, receipts, ai_categorizer, financial_advisor, tax_assistant, scenario_planner, investments, auth, assets, diag, migrate
+    from app.routes import main, accounts, transactions, categories, backup, backup_view, settings, receipts, ai_categorizer, financial_advisor, tax_assistant, scenario_planner, investments, auth, assets, diag
+    from app.routes import migrate as migrate_routes
     app.register_blueprint(main.bp)
     app.register_blueprint(accounts.bp)
     app.register_blueprint(transactions.bp)
@@ -74,7 +75,7 @@ def create_app(config_class=Config):
     app.register_blueprint(auth.bp)
     app.register_blueprint(assets.bp)
     app.register_blueprint(diag.bp)
-    app.register_blueprint(migrate.bp)
+    app.register_blueprint(migrate_routes.bp)
 
     # Ensure data directory exists
     import os
