@@ -621,8 +621,9 @@ function showReviewModal(statementInfo = null) {
                        value="${trans.description}" data-field="description" data-index="${index}">
             </td>
             <td>
-                <input type="number" class="form-control form-control-sm"
-                       step="0.01" value="${trans.amount}" data-field="amount" data-index="${index}">
+                <input type="number" class="form-control"
+                       step="0.01" value="${trans.amount}" data-field="amount" data-index="${index}"
+                       style="min-width: 120px; font-size: 1rem; font-weight: 600;">
             </td>
             <td>
                 <select class="form-select form-select-sm" data-field="category_id" data-index="${index}">

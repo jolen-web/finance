@@ -178,7 +178,7 @@ def bulk_import():
                 imported_count += 1
             except Exception as e:
                 # Log error but continue with other transactions
-                print(f"Error importing transaction: {str(e)}")
+                current_app.logger.warning(f"Error importing transaction from {trans_data.get('description', 'Unknown')}: {str(e)}")
                 continue
 
         # Update account balance
@@ -265,12 +265,10 @@ def bulk_import():
 
     except Exception as e:
         # Return error response
+        current_app.logger.error(f'Bulk import error: {str(e)}', exc_info=True)
         error_msg = f'Error importing transactions: {str(e)}'
-        if import_data:
-            return jsonify({'error': error_msg}), 400
-        else:
-            flash(error_msg, 'danger')
-            return redirect(request.referrer or url_for('receipts.index'))
+        # Always return JSON since this is an AJAX endpoint
+        return jsonify({'error': error_msg, 'success': False}), 400
 
 @bp.route('/upload-new', methods=['GET', 'POST'])
 @login_required
