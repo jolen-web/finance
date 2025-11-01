@@ -49,13 +49,17 @@ def index():
     # Get user's dashboard preferences
     prefs = DashboardPreferences.query.filter_by(user_id=current_user.id).first()
 
+    # Check if user has a Gemini API key configured
+    has_gemini_key = current_user.gemini_api_key is not None and current_user.gemini_api_key.strip() != ''
+
     try:
         return render_template('settings/index.html',
                              settings=settings,
                              currencies=currencies,
                              current_currency=current_currency,
                              categories=categories,
-                             prefs=prefs)
+                             prefs=prefs,
+                             has_gemini_key=has_gemini_key)
     except Exception as e:
         current_app.logger.error(f"Error rendering settings index: {e}", exc_info=True)
         flash('An error occurred while loading the settings page.', 'danger')
@@ -296,5 +300,58 @@ def regex_patterns():
             db.session.commit()
             flash('Regex pattern deleted successfully!', 'success')
             return redirect(url_for('settings.regex_patterns'))
-            
+
     return render_template('settings/regex_patterns.html', patterns=patterns)
+
+
+@bp.route('/api-configuration', methods=['GET', 'POST'])
+@login_required
+def api_configuration():
+    """Manage API keys for receipt extraction"""
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'save_gemini_key':
+            api_key = request.form.get('gemini_api_key', '').strip()
+
+            if not api_key:
+                flash('API key cannot be empty', 'danger')
+                return redirect(url_for('settings.api_configuration'))
+
+            # Validate the API key by trying to use it
+            from app.services.receipt_ocr import validate_gemini_api_key
+            is_valid, error_msg = validate_gemini_api_key(api_key)
+
+            if not is_valid:
+                flash(f'Invalid API key: {error_msg}', 'danger')
+                return redirect(url_for('settings.api_configuration'))
+
+            # Save the API key
+            current_user.gemini_api_key = api_key
+            db.session.commit()
+            flash('Gemini API key saved successfully!', 'success')
+            return redirect(url_for('settings.api_configuration'))
+
+        elif action == 'remove_gemini_key':
+            current_user.gemini_api_key = None
+            db.session.commit()
+            flash('Gemini API key removed successfully!', 'success')
+            return redirect(url_for('settings.api_configuration'))
+
+        elif action == 'test_gemini_key':
+            if not current_user.gemini_api_key:
+                flash('No API key configured', 'danger')
+                return redirect(url_for('settings.api_configuration'))
+
+            from app.services.receipt_ocr import validate_gemini_api_key
+            is_valid, error_msg = validate_gemini_api_key(current_user.gemini_api_key)
+
+            if is_valid:
+                flash('API key is valid and working!', 'success')
+            else:
+                flash(f'API key test failed: {error_msg}', 'danger')
+
+            return redirect(url_for('settings.api_configuration'))
+
+    has_gemini_key = current_user.gemini_api_key is not None and current_user.gemini_api_key.strip() != ''
+    return render_template('settings/api_configuration.html', has_gemini_key=has_gemini_key)

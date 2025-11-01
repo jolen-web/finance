@@ -48,6 +48,26 @@
 
         <div class="card mt-4">
             <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-moon"></i> Display Preferences</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Theme</label>
+                    <div class="d-flex align-items-center">
+                        <button id="theme-toggle-btn" class="btn btn-outline-primary d-flex align-items-center gap-2" style="border: 2px solid; padding: 0.5rem 1.5rem;">
+                            <i class="fas fa-moon"></i>
+                            <span id="theme-label">Switch to Dark Mode</span>
+                        </button>
+                    </div>
+                    <small class="form-text text-muted d-block mt-2">
+                        Current theme: <strong id="current-theme-display">Light Mode</strong>
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Dashboard Preferences</h5>
             </div>
             <div class="card-body">
@@ -227,6 +247,31 @@
     </div>
 
     <div class="col-md-4">
+        <!-- Quick Links -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-link"></i> Quick Links</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <a href="{{ url_for('settings.api_configuration') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-key"></i> API Configuration
+                        {% if has_gemini_key %}<span class="badge bg-success float-end">Configured</span>{% endif %}
+                    </a>
+                    <a href="{{ url_for('settings.regex_patterns') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-filter"></i> Regex Patterns
+                    </a>
+                    <a href="{{ url_for('settings.dashboard_preferences') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-cog"></i> Dashboard Preferences
+                    </a>
+                    <a href="{{ url_for('settings.account_types') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-list"></i> Account Types
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Currencies -->
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Available Currencies</h5>

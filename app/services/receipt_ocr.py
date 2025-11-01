@@ -237,15 +237,27 @@ class ReceiptOCRAgent:
         except Exception as e:
             return None, f"PDF extraction error: {str(e)}"
 
-    def extract_with_gemini_text(self, ocr_text):
-        """Use Gemini to parse OCR text into structured transaction data"""
-        if not GEMINI_AVAILABLE:
+    def extract_with_gemini_text(self, ocr_text, api_key=None):
+        """Use Gemini to parse OCR text into structured transaction data
+
+        Args:
+            ocr_text (str): The OCR text to parse
+            api_key (str, optional): Specific API key to use (defaults to configured key)
+        """
+        if not GEMINI_AVAILABLE and not api_key:
             return None, "Gemini not available"
 
         import logging
         logger = logging.getLogger(__name__)
 
         try:
+            # Use provided API key or fall back to configured one
+            import google.generativeai as genai_local
+            if api_key:
+                genai_local.configure(api_key=api_key)
+            elif not GEMINI_AVAILABLE:
+                return None, "Gemini not available"
+
             # Create Gemini prompt for parsing OCR text
             prompt = f"""Parse this OCR-extracted text from a credit card statement or receipt into structured transaction data.
 
@@ -276,7 +288,7 @@ CRITICAL RULES:
 
             # Call Gemini API with text-only (no image)
             # Use the base model name for text generation
-            model = genai.GenerativeModel('gemini-2.0-flash')
+            model = genai_local.GenerativeModel('gemini-2.0-flash')
             response = model.generate_content(prompt)
 
             # Parse response
@@ -310,8 +322,13 @@ CRITICAL RULES:
                 return None, f"Failed to parse Gemini response: {response_text[:100]}"
 
         except Exception as e:
-            logger.error(f"Gemini text parsing error: {str(e)}")
-            return None, f"Gemini text parsing error: {str(e)}"
+            error_str = str(e)
+            # Check for rate limit error (429)
+            if '429' in error_str or 'Resource exhausted' in error_str:
+                logger.warning(f"Gemini API rate limit reached (429): {error_str}")
+                return None, "RATE_LIMIT_429"
+            logger.error(f"Gemini text parsing error: {error_str}")
+            return None, f"Gemini text parsing error: {error_str}"
 
     def extract_with_gemini(self, image_path):
         """Extract receipt data using Gemini Vision API for intelligent analysis"""
@@ -396,7 +413,13 @@ CRITICAL RULES:
                 return None, f"Failed to parse Gemini response: {response_text[:100]}"
 
         except Exception as e:
-            return None, f"Gemini extraction error: {str(e)}"
+            error_str = str(e)
+            # Check for rate limit error (429)
+            if '429' in error_str or 'Resource exhausted' in error_str:
+                import logging
+                logging.warning(f"Gemini API rate limit reached (429): {error_str}")
+                return None, "RATE_LIMIT_429"
+            return None, f"Gemini extraction error: {error_str}"
 
     def _parse_column_format(self, ocr_text, logger):
         """Parse OCR text when dates, descriptions, and amounts are in separate columns/lines
@@ -501,7 +524,12 @@ CRITICAL RULES:
 
         # Get learned patterns from the database
         from app.models import RegexPattern
-        learned_patterns = RegexPattern.query.filter_by(user_id=user_id).order_by(RegexPattern.confidence_score.desc()).all()
+        try:
+            learned_patterns = RegexPattern.query.filter_by(user_id=user_id).order_by(RegexPattern.confidence_score.desc()).all()
+        except Exception as e:
+            import logging
+            logging.warning(f"Error loading regex patterns for user {user_id}: {str(e)}")
+            learned_patterns = []
         
         # Common patterns for credit card statements
         patterns = [
@@ -804,13 +832,15 @@ CRITICAL RULES:
 
         return data
 
-    def extract_receipt_data(self, file, user_id, temp_folder='temp', password=None):
+    def extract_receipt_data(self, file, user_id, temp_folder='temp', password=None, user=None):
         """Extract data from receipt without creating database records
 
         Args:
             file: Uploaded file object
+            user_id: User ID for organizing temp files
             temp_folder: Folder name for temporary storage
             password: Optional password for encrypted PDFs
+            user: Optional Flask-Login user object (for accessing user's API key)
 
         Returns:
             tuple: (filepath, filename, parsed_data, file_type) or (None, None, error_message, None)
@@ -818,6 +848,13 @@ CRITICAL RULES:
         import logging
         logger = logging.getLogger(__name__)
         logger.info("--- Starting Receipt Extraction ---")
+
+        # Get user's API key if available
+        user_api_key = get_active_gemini_api_key(user) if user else None
+        if user_api_key and user_api_key != os.getenv('GOOGLE_API_KEY'):
+            logger.info("Using user's personal Gemini API key for extraction")
+        elif user_api_key:
+            logger.info("Using system Gemini API key for extraction")
 
         # Save file to temporary location
         filepath, filename_or_error = self.save_receipt_file(file, temp_folder)
@@ -849,6 +886,8 @@ CRITICAL RULES:
 
         # Step 2: Try to parse with Gemini (intelligent structuring)
         parsed_data = None
+        rate_limit_hit = False
+
         if GEMINI_AVAILABLE:
             if not is_pdf:
                 logger.info("Attempting to parse with Gemini Vision API (image input)...")
@@ -860,12 +899,15 @@ CRITICAL RULES:
                         logger.info(f"✓ Gemini Vision parsed {len(gemini_data['line_items'])} transactions.")
                     else:
                         logger.warning("✗ Gemini Vision returned empty line_items.")
+                elif gemini_error == "RATE_LIMIT_429":
+                    logger.warning("✗ Gemini Vision rate limit hit (429)")
+                    rate_limit_hit = True
                 else:
                     logger.warning(f"✗ Gemini Vision parsing failed: {gemini_error}")
 
             if not parsed_data and ocr_text:
                 logger.info("Attempting to parse with Gemini Text API (text input)...")
-                gemini_data, gemini_error = self.extract_with_gemini_text(ocr_text)
+                gemini_data, gemini_error = self.extract_with_gemini_text(ocr_text, api_key=user_api_key)
                 if gemini_data and not gemini_error:
                     if gemini_data.get('line_items'):
                         parsed_data = gemini_data
@@ -873,6 +915,9 @@ CRITICAL RULES:
                         logger.info(f"✓ Gemini Text parsed {len(gemini_data['line_items'])} transactions.")
                     else:
                         logger.warning("✗ Gemini Text returned empty line_items.")
+                elif gemini_error == "RATE_LIMIT_429":
+                    logger.warning("✗ Gemini Text rate limit hit (429)")
+                    rate_limit_hit = True
                 else:
                     logger.warning(f"✗ Gemini Text parsing failed: {gemini_error}")
         else:
@@ -890,6 +935,13 @@ CRITICAL RULES:
                     logger.warning("✗ Regex parsing found no transactions.")
             else:
                 logger.error("Cannot perform regex parsing because OCR text is empty.")
+
+        # Flag rate limit hit if it occurred
+        if parsed_data is None:
+            parsed_data = {}
+        if rate_limit_hit:
+            parsed_data['_rate_limit_429'] = True
+            logger.warning("Rate limit flag set in parsed_data")
 
         logger.info("--- Finished Receipt Extraction ---")
         return filepath, filename_or_error, parsed_data, file_type
@@ -1096,3 +1148,71 @@ CRITICAL RULES:
             'with_merchant': receipts_with_merchant,
             'extraction_rate': (receipts_with_amount / total_receipts * 100) if total_receipts > 0 else 0
         }
+
+
+# Module-level functions for API key validation (used by settings page)
+
+def validate_gemini_api_key(api_key):
+    """Validate a Gemini API key by attempting a simple API call
+
+    Args:
+        api_key (str): The Gemini API key to validate
+
+    Returns:
+        tuple: (is_valid, error_message) where is_valid is boolean
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    if not api_key or not api_key.strip():
+        return False, "API key is empty"
+
+    try:
+        import google.generativeai as genai
+
+        # Configure with the provided API key
+        genai.configure(api_key=api_key)
+
+        # Try a simple API call to validate the key
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        response = model.generate_content("Say 'OK' in one word only")
+
+        if response and response.text:
+            logger.info("✓ Gemini API key is valid")
+            return True, None
+        else:
+            return False, "No response from API"
+
+    except Exception as e:
+        error_str = str(e)
+        logger.error(f"API key validation error: {error_str}")
+
+        # Provide specific error messages based on error type
+        if 'API key' in error_str or 'authentication' in error_str.lower():
+            return False, "Invalid API key (authentication failed)"
+        elif '429' in error_str or 'Resource exhausted' in error_str:
+            return False, "Rate limit exceeded (try again later)"
+        elif '403' in error_str or 'Permission' in error_str:
+            return False, "API access denied (check project configuration)"
+        else:
+            return False, error_str[:100]
+
+
+def get_active_gemini_api_key(user=None):
+    """Get the active Gemini API key, prioritizing user's key over system key
+
+    Args:
+        user: Flask-Login user object (optional)
+
+    Returns:
+        str or None: The API key to use, or None if not available
+    """
+    # Try user's personal API key first
+    if user and hasattr(user, 'gemini_api_key') and user.gemini_api_key:
+        user_key = user.gemini_api_key.strip()
+        if user_key:
+            return user_key
+
+    # Fall back to system API key from environment
+    system_key = os.getenv('GOOGLE_API_KEY')
+    return system_key if system_key else None

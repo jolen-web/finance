@@ -319,7 +319,8 @@ def upload_new():
         agent = ReceiptOCRAgent()
 
         # Extract data without creating database records yet
-        filepath, filename, parsed_data, file_type = agent.extract_receipt_data(file, current_user.id, 'temp', password=pdf_password)
+        # Pass user object so extraction can use their personal API key if configured
+        filepath, filename, parsed_data, file_type = agent.extract_receipt_data(file, current_user.id, 'temp', password=pdf_password, user=current_user)
 
         if not filepath:
             # Check if PDF password is required
@@ -349,15 +350,38 @@ def upload_new():
         current_app.logger.info(f"Extracted {len(line_items)} line items from receipt using {extraction_method}")
         current_app.logger.debug(f"Parsed data: {parsed_data}")
 
-        # Check if extraction was successful
+        # Check if extraction was successful or if it's a rate limit issue
+        rate_limit_hit = parsed_data.get('_rate_limit_429', False)
+
         if not line_items or len(line_items) == 0:
-            error_msg = "Unable to extract any transactions from the uploaded image. We tried:\n• Step 1: AI analysis\n• Step 2: OCR text extraction\n\nPlease ensure the image is clear and contains visible transaction data with dates, descriptions, and amounts."
-            current_app.logger.warning(f"Empty extraction result for file: {filename}")
-            return jsonify({
-                'error': error_msg,
-                'extraction_method': extraction_method,
-                'steps_tried': ['ai', 'ocr']
-            }), 400
+            if rate_limit_hit:
+                # Rate limit reached - show friendly message but still allow manual entry
+                current_app.logger.warning(f"Rate limit hit while processing file: {filename}")
+                session['rate_limit_message'] = {
+                    'status': 'warning',
+                    'text': '⏳ API Rate Limit Reached: We\'ve hit our AI processing limit. Using OCR-only mode. You can still upload and manually enter transactions!'
+                }
+                return jsonify({
+                    'line_items': [],  # Empty - no transactions found
+                    'extraction_method': 'ocr',
+                    'rate_limit_hit': True,
+                    'transaction_count': 0,
+                    'message': 'OCR-only mode: No transactions detected. Please add them manually below.'
+                }), 200  # Return 200 so form displays with empty state
+            else:
+                # Normal case - no transactions found
+                error_msg = "Unable to extract any transactions from the uploaded image.\n\nPlease ensure the image is clear and contains visible transaction data, or add transactions manually below."
+                current_app.logger.warning(f"Empty extraction result for file: {filename}")
+                session['rate_limit_message'] = {
+                    'status': 'info',
+                    'text': '📄 No transactions were automatically detected. You can still add them manually below!'
+                }
+                return jsonify({
+                    'line_items': [],  # Empty - return form for manual entry
+                    'extraction_method': extraction_method,
+                    'transaction_count': 0,
+                    'message': 'No transactions detected. Please add them manually below.'
+                }), 200  # Return 200 so form displays with empty state
 
         # If we have multi-line transactions, use them
         if line_items and len(line_items) > 0:
