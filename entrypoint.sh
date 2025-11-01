@@ -1,12 +1,15 @@
 #!/bin/bash
 set -e
 
-# Run database migrations to ensure schema is up to date
+# Try to run database migrations with a timeout
 echo "Running database migrations..."
-python -m flask db upgrade || {
-  echo "Migration failed, attempting to fix migration history..."
-  python -m flask db stamp e6dc16bff2b7
-  python -m flask db upgrade
+timeout 30 python -m flask db upgrade || {
+  migration_status=$?
+  if [ $migration_status -eq 124 ]; then
+    echo "Warning: Migration timed out after 30 seconds, continuing without migrations..."
+  elif [ $migration_status -ne 0 ]; then
+    echo "Warning: Migration failed with status $migration_status, continuing anyway..."
+  fi
 }
 
 echo "Starting application..."
