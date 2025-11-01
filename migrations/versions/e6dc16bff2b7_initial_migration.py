@@ -74,6 +74,7 @@ def upgrade():
     sa.Column('show_investments', sa.Boolean(), nullable=True),
     sa.Column('show_assets', sa.Boolean(), nullable=True),
     sa.Column('show_receipts', sa.Boolean(), nullable=True),
+    sa.Column('default_page', sa.String(length=50), nullable=True, server_default='dashboard'),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
