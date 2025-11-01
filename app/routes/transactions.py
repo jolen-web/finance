@@ -1,8 +1,28 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import current_user, login_required
-from app.models import Transaction, Account, Category
+from app.models import Transaction, Account, Category, RegexPattern
 from app import db
 from datetime import datetime
+
+def learn_regex_from_payee(payee, user_id, account_type):
+    import re
+
+    if not payee:
+        return
+
+    # Simple regex: escape special characters and allow for some variations
+    pattern = re.escape(payee)
+    
+    # Check if a similar pattern already exists
+    existing_pattern = RegexPattern.query.filter_by(user_id=user_id, pattern=pattern).first()
+    if not existing_pattern:
+        new_pattern = RegexPattern(
+            user_id=user_id,
+            pattern=pattern,
+            account_type=account_type,
+            confidence_score=0.6  # Start with a medium confidence
+        )
+        db.session.add(new_pattern)
 
 bp = Blueprint('transactions', __name__, url_prefix='/transactions')
 
@@ -74,6 +94,9 @@ def new_transaction():
             account = Account.query.filter_by(id=account_id, user_id=current_user.id).first_or_404()
             account.update_balance()
 
+            # Learn regex from payee
+            learn_regex_from_payee(payee, current_user.id, account.account_type)
+
             db.session.commit()
 
             payee_display = payee if payee else 'Transaction'
@@ -118,6 +141,9 @@ def edit_transaction(id):
 
         account = Account.query.filter_by(id=transaction.account_id, user_id=current_user.id).first_or_404()
         account.update_balance()
+
+        # Learn regex from payee
+        learn_regex_from_payee(transaction.payee, current_user.id, account.account_type)
 
         db.session.commit()
 
@@ -228,7 +254,7 @@ def quick_add_transaction():
         payee = data.get('payee', '')
         account_id = data.get('account_id')
         category_id = data.get('category_id')
-        transaction_type = data.get('transaction_type', 'expense')
+        transaction_type = data.get('transaction_type', 'withdrawal')
         memo = data.get('memo', '')
 
         # Validate required fields
@@ -270,6 +296,9 @@ def quick_add_transaction():
 
         # Update account balance
         account.update_balance()
+
+        # Learn regex from payee
+        learn_regex_from_payee(payee, current_user.id, account.account_type)
 
         db.session.commit()
 

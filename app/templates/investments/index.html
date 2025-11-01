@@ -135,6 +135,7 @@
                                                 <i class="fas fa-pencil-alt"></i>
                                             </a>
                                             <form action="{{ url_for('investments.delete_investment', id=investment.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this investment?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">
                                                     <i class="fas fa-trash"></i>
                                                 </button>

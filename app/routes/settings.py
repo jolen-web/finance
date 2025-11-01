@@ -44,6 +44,8 @@ def index():
     if not current_currency:
         current_currency = current_app.config['DEFAULT_CURRENCY']
 
+    categories = Category.query.filter_by(user_id=current_user.id).order_by(Category.name).all()
+
     try:
         return render_template('settings/index.html',
                              settings=settings,
@@ -212,3 +214,58 @@ def dashboard_preferences():
         return redirect(url_for('settings.dashboard_preferences'))
 
     return render_template('settings/dashboard.html', prefs=prefs)
+
+@bp.route('/regex-patterns', methods=['GET', 'POST'])
+@login_required
+def regex_patterns():
+    from app.models import RegexPattern
+    patterns = RegexPattern.query.filter_by(user_id=current_user.id).order_by(RegexPattern.created_at.desc()).all()
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'add' or action == 'edit':
+            pattern_id = request.form.get('pattern_id')
+            pattern_str = request.form.get('pattern').strip()
+            account_type = request.form.get('account_type')
+            confidence_score = float(request.form.get('confidence_score', 0.5))
+            
+            if not pattern_str:
+                flash('Regex pattern cannot be empty.', 'danger')
+                return redirect(url_for('settings.regex_patterns'))
+            
+            if pattern_id: # Edit existing
+                regex_pattern = RegexPattern.query.get_or_404(pattern_id)
+                if regex_pattern.user_id != current_user.id:
+                    flash('Access denied.', 'danger')
+                    return redirect(url_for('settings.regex_patterns'))
+                regex_pattern.pattern = pattern_str
+                regex_pattern.account_type = account_type if account_type else None
+                regex_pattern.confidence_score = confidence_score
+                flash('Regex pattern updated successfully!', 'success')
+            else: # Add new
+                regex_pattern = RegexPattern(
+                    user_id=current_user.id,
+                    pattern=pattern_str,
+                    account_type=account_type if account_type else None,
+                    confidence_score=confidence_score
+                )
+                db.session.add(regex_pattern)
+                flash('Regex pattern added successfully!', 'success')
+            
+            db.session.commit()
+            return redirect(url_for('settings.regex_patterns'))
+            
+        elif action == 'delete':
+            pattern_id = request.form.get('pattern_id')
+            regex_pattern = RegexPattern.query.get_or_404(pattern_id)
+            if regex_pattern.user_id != current_user.id:
+                flash('Access denied.', 'danger')
+                return redirect(url_for('settings.regex_patterns'))
+            
+            db.session.delete(regex_pattern)
+            db.session.commit()
+            flash('Regex pattern deleted successfully!', 'success')
+            return redirect(url_for('settings.regex_patterns'))
+            
+    return render_template('settings/regex_patterns.html', patterns=patterns)

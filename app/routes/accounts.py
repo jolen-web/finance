@@ -10,9 +10,22 @@ bp = Blueprint('accounts', __name__, url_prefix='/accounts')
 def list_accounts():
     """List all accounts"""
     accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
-    current_app.logger.debug(f"Accounts retrieved for user {current_user.id}: {[a.name for a in accounts]}")
-    total_balance = sum(account.current_balance for account in accounts)
-    return render_template('accounts/list.html', accounts=accounts, total_balance=total_balance)
+    
+    total_assets = 0
+    total_liabilities = 0
+    for account in accounts:
+        if account.account_type == 'credit_card':
+            total_liabilities += account.current_balance
+        else:
+            total_assets += account.current_balance
+            
+    net_worth = total_assets - total_liabilities
+    
+    return render_template('accounts/list.html', 
+                           accounts=accounts, 
+                           total_assets=total_assets,
+                           total_liabilities=total_liabilities,
+                           net_worth=net_worth)
 
 @bp.route('/new', methods=['GET', 'POST'])
 @login_required
@@ -21,7 +34,11 @@ def new_account():
     if request.method == 'POST':
         name = request.form.get('name')
         account_type = request.form.get('account_type')
-        starting_balance = float(request.form.get('starting_balance', 0))
+        try:
+            starting_balance = float(request.form.get('starting_balance', 0))
+        except ValueError:
+            flash('Starting balance must be a valid number.', 'danger')
+            return redirect(url_for('accounts.new_account'))
 
         account = Account(
             user_id=current_user.id,

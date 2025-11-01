@@ -3,6 +3,9 @@
 __pycache__/
 *.pyc
 
+# Environment variables
+.env
+
 # Database
 data/*.db
 
@@ -14,3 +17,6 @@ sessions/sessions-state.json
 sessions/package.json
 sessions/transcripts/
 sessions/.archived/
+
+.gemini/
+gha-creds-*.json

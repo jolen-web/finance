@@ -96,6 +96,7 @@
                                                 <i class="fas fa-eye"></i> View
                                             </a>
                                             <form action="{{ url_for('receipts.delete', receipt_id=receipt.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this receipt?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">
                                                     <i class="fas fa-trash"></i>
                                                 </button>

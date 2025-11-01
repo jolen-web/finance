@@ -1,0 +1,39 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: finance-tracker-migrate
+spec:
+  template:
+    spec:
+      template:
+        spec:
+          containers:
+          - image: gcr.io/jinolen/finance-tracker:latest
+            command: ["flask", "db", "upgrade"]
+            env:
+            - name: FLASK_APP
+              value: "wsgi:app"
+            - name: FLASK_ENV
+              value: "production"
+            - name: DB_USER
+              value: "postgres"
+            - name: DB_NAME
+              value: "finance"
+            - name: CLOUD_SQL_CONNECTION_NAME
+              value: "jinolen:us-central1:finance-db"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: "latest"
+                  name: "finance-db-password"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: "latest"
+                  name: "flask-secret-key"
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: "latest"
+                  name: "gemini-api-key"
+          restartPolicy: OnFailure

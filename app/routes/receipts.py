@@ -28,9 +28,15 @@ def index():
                          receipts=recent_receipts)
 
 @bp.route('/upload/<int:transaction_id>', methods=['GET', 'POST'])
+@login_required
 def upload(transaction_id):
     """Upload receipt for a transaction"""
     transaction = Transaction.query.get_or_404(transaction_id)
+
+    # Verify user owns this transaction
+    if transaction.user_id != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('receipts.index'))
 
     if request.method == 'POST':
         if 'receipt_file' not in request.files:
@@ -269,6 +275,7 @@ def bulk_import():
 @bp.route('/upload-new', methods=['GET', 'POST'])
 @login_required
 def upload_new():
+    current_app.logger.info("--- In upload_new function ---")
     """Upload receipt and create new transaction"""
     if request.method == 'POST':
         if 'receipt_file' not in request.files:
@@ -290,7 +297,7 @@ def upload_new():
         agent = ReceiptOCRAgent()
 
         # Extract data without creating database records yet
-        filepath, filename, parsed_data, file_type = agent.extract_receipt_data(file, 'temp', password=pdf_password)
+        filepath, filename, parsed_data, file_type = agent.extract_receipt_data(file, current_user.id, 'temp', password=pdf_password)
 
         if not filepath:
             # Check if PDF password is required
@@ -429,9 +436,16 @@ def confirm_receipt():
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/camera/<int:transaction_id>')
+@login_required
 def camera_capture(transaction_id):
     """Camera capture page for receipt"""
     transaction = Transaction.query.get_or_404(transaction_id)
+
+    # Verify user owns this transaction
+    if transaction.user_id != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('receipts.index'))
+
     return render_template('receipts/camera.html', transaction=transaction)
 
 @bp.route('/view/<int:receipt_id>')

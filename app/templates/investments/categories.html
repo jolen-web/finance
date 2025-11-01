@@ -45,6 +45,7 @@
                                         <i class="fas fa-pencil-alt"></i> Edit
                                     </a>
                                     <form action="{{ url_for('investments.delete_category', id=category.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this category?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                         <button type="submit" class="btn btn-sm btn-outline-danger">
                                             <i class="fas fa-trash"></i> Delete
                                         </button>

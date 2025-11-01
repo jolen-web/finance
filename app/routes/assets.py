@@ -15,11 +15,11 @@ ASSET_TYPES = [
 def list_assets():
     """List all assets for current user"""
     page = request.args.get('page', 1, type=int)
-    assets = Asset.query.order_by(Asset.created_at.desc()).paginate(
+    assets = Asset.query.filter_by(user_id=current_user.id).order_by(Asset.created_at.desc()).paginate(
         page=page, per_page=50)
 
     # Calculate totals
-    all_assets = Asset.query.all()
+    all_assets = Asset.query.filter_by(user_id=current_user.id).all()
     total_value = sum(asset.current_value for asset in all_assets)
     total_invested = sum(asset.purchase_price or 0 for asset in all_assets)
     total_gain_loss = total_value - total_invested
@@ -108,12 +108,7 @@ def new_asset():
 @login_required
 def edit_asset(id):
     """Edit asset"""
-    asset = Asset.query.get_or_404(id)
-
-    # Ensure user owns this asset
-    if asset.user_id != current_user.id:
-        flash('You do not have permission to edit this asset', 'danger')
-        return redirect(url_for('assets.list_assets'))
+    asset = Asset.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
@@ -184,12 +179,7 @@ def edit_asset(id):
 @login_required
 def delete_asset(id):
     """Delete asset"""
-    asset = Asset.query.get_or_404(id)
-
-    # Ensure user owns this asset
-    if asset.user_id != current_user.id:
-        flash('You do not have permission to delete this asset', 'danger')
-        return redirect(url_for('assets.list_assets'))
+    asset = Asset.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     try:
         asset_name = asset.name

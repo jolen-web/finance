@@ -94,6 +94,8 @@ def test_data_isolation():
     print("DATA ISOLATION TEST - Verifying users cannot see each other's data")
     print("=" * 70)
 
+    time.sleep(5)
+
     # Create two test users
     user_a = UserSession('isolationtest_a', 'isola@test.com', 'TestPass123!')
     user_b = UserSession('isolationtest_b', 'isolb@test.com', 'TestPass456!')

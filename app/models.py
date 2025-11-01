@@ -1,7 +1,7 @@
 from datetime import datetime
-from app import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+from app import db
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -64,7 +64,7 @@ class Account(db.Model):
                 # Deposits increase balance, withdrawals decrease balance
                 if transaction.transaction_type == 'deposit':
                     total += transaction.amount
-                elif transaction.transaction_type == 'withdrawal':
+                elif transaction.transaction_type == 'withdrawal' or transaction.transaction_type == 'transfer':
                     total -= transaction.amount
 
         self.current_balance = total
@@ -355,3 +355,19 @@ class PayeeCategory(db.Model):
 
     def __repr__(self):
         return f'<PayeeCategory {self.payee} → {self.category.name}>'
+
+
+class RegexPattern(db.Model):
+    __tablename__ = 'regex_patterns'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    pattern = db.Column(db.String(500), nullable=False)
+    account_type = db.Column(db.String(50), nullable=True)
+    confidence_score = db.Column(db.Float, default=0.5)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='regex_patterns')
+
+    def __repr__(self):
+        return f'<RegexPattern {self.pattern}>'
