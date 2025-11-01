@@ -35,10 +35,10 @@ def create_app(config_class=Config):
         csp = {
             'default-src': "'self'",
             'img-src': ['*', 'data:', 'blob:'],
-            'script-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'unpkg.com'],
-            'style-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'fonts.googleapis.com'],
-            'font-src': ["'self'", 'fonts.gstatic.com'],
-            'connect-src': "'self'"
+            'script-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'unpkg.com', 'cdnjs.cloudflare.com'],
+            'style-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'cdnjs.cloudflare.com'],
+            'font-src': ["'self'", 'fonts.gstatic.com', 'cdnjs.cloudflare.com'],
+            'connect-src': ["'self'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com']
         }
         Talisman(app,
                  content_security_policy=csp,
