@@ -46,6 +46,14 @@
     cursor: pointer;
 }
 
+/* Larger amount input for better visibility */
+#transactionsTable input[type="number"] {
+    min-width: 140px !important;
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    padding: 0.5rem !important;
+}
+
 /* Highlight selected rows */
 tr:has(.transaction-checkbox:checked) {
     background-color: rgba(13, 110, 253, 0.05);
@@ -623,7 +631,7 @@ function showReviewModal(statementInfo = null) {
             <td>
                 <input type="number" class="form-control"
                        step="0.01" value="${trans.amount}" data-field="amount" data-index="${index}"
-                       style="min-width: 120px; font-size: 1rem; font-weight: 600;">
+                       style="min-width: 140px; width: 140px; font-size: 1.1rem; font-weight: 700; padding: 0.5rem;">
             </td>
             <td>
                 <select class="form-select form-select-sm" data-field="category_id" data-index="${index}">
