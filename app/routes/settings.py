@@ -326,10 +326,14 @@ def api_configuration():
                 flash(f'Invalid API key: {error_msg}', 'danger')
                 return redirect(url_for('settings.api_configuration'))
 
-            # Save the API key
-            current_user.gemini_api_key = api_key
-            db.session.commit()
-            flash('Gemini API key saved successfully!', 'success')
+            # Save the API key (encrypted)
+            try:
+                current_user.set_gemini_api_key(api_key)
+                db.session.commit()
+                flash('Gemini API key saved successfully! (encrypted)', 'success')
+            except ValueError as e:
+                flash(f'Failed to save API key: {str(e)}', 'danger')
+
             return redirect(url_for('settings.api_configuration'))
 
         elif action == 'remove_gemini_key':

@@ -1207,11 +1207,16 @@ def get_active_gemini_api_key(user=None):
     Returns:
         str or None: The API key to use, or None if not available
     """
-    # Try user's personal API key first
-    if user and hasattr(user, 'gemini_api_key') and user.gemini_api_key:
-        user_key = user.gemini_api_key.strip()
-        if user_key:
-            return user_key
+    # Try user's personal API key first (decrypted)
+    if user and hasattr(user, 'get_gemini_api_key'):
+        try:
+            user_key = user.get_gemini_api_key()
+            if user_key:
+                return user_key
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to decrypt user's API key: {str(e)}")
 
     # Fall back to system API key from environment
     system_key = os.getenv('GOOGLE_API_KEY')
