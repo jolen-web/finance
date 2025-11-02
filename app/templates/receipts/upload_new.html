@@ -494,6 +494,11 @@ async function submitForm(formData, password = null) {
                 progressMessage.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i><strong>Warning:</strong> No transactions extracted from receipt';
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
+
+                // Auto-dismiss warning after 3 seconds
+                setTimeout(function() {
+                    progressDiv.style.display = 'none';
+                }, 3000);
             }
         } else {
             // Single receipt - follow redirect
