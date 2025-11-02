@@ -323,6 +323,10 @@ CRITICAL RULES:
 
         except Exception as e:
             error_str = str(e)
+            # Check for API key invalid/expired error (400)
+            if '400' in error_str or 'API_KEY_INVALID' in error_str or 'API key' in error_str.lower():
+                logger.warning(f"Gemini API key invalid/expired (400): {error_str}")
+                return None, "API_KEY_INVALID"
             # Check for rate limit error (429)
             if '429' in error_str or 'Resource exhausted' in error_str:
                 logger.warning(f"Gemini API rate limit reached (429): {error_str}")
@@ -414,6 +418,11 @@ CRITICAL RULES:
 
         except Exception as e:
             error_str = str(e)
+            # Check for API key invalid/expired error (400)
+            if '400' in error_str or 'API_KEY_INVALID' in error_str or 'API key' in error_str.lower():
+                import logging
+                logging.warning(f"Gemini API key invalid/expired (400): {error_str}")
+                return None, "API_KEY_INVALID"
             # Check for rate limit error (429)
             if '429' in error_str or 'Resource exhausted' in error_str:
                 import logging
@@ -887,6 +896,7 @@ CRITICAL RULES:
         # Step 2: Try to parse with Gemini (intelligent structuring)
         parsed_data = None
         rate_limit_hit = False
+        api_key_invalid = False
 
         if GEMINI_AVAILABLE:
             if not is_pdf:
@@ -899,6 +909,9 @@ CRITICAL RULES:
                         logger.info(f"✓ Gemini Vision parsed {len(gemini_data['line_items'])} transactions.")
                     else:
                         logger.warning("✗ Gemini Vision returned empty line_items.")
+                elif gemini_error == "API_KEY_INVALID":
+                    logger.warning("✗ Gemini Vision API key invalid/expired (400)")
+                    api_key_invalid = True
                 elif gemini_error == "RATE_LIMIT_429":
                     logger.warning("✗ Gemini Vision rate limit hit (429)")
                     rate_limit_hit = True
@@ -915,6 +928,9 @@ CRITICAL RULES:
                         logger.info(f"✓ Gemini Text parsed {len(gemini_data['line_items'])} transactions.")
                     else:
                         logger.warning("✗ Gemini Text returned empty line_items.")
+                elif gemini_error == "API_KEY_INVALID":
+                    logger.warning("✗ Gemini Text API key invalid/expired (400)")
+                    api_key_invalid = True
                 elif gemini_error == "RATE_LIMIT_429":
                     logger.warning("✗ Gemini Text rate limit hit (429)")
                     rate_limit_hit = True
@@ -936,12 +952,15 @@ CRITICAL RULES:
             else:
                 logger.error("Cannot perform regex parsing because OCR text is empty.")
 
-        # Flag rate limit hit if it occurred
+        # Flag rate limit hit or API key invalid if they occurred
         if parsed_data is None:
             parsed_data = {}
         if rate_limit_hit:
             parsed_data['_rate_limit_429'] = True
             logger.warning("Rate limit flag set in parsed_data")
+        if api_key_invalid:
+            parsed_data['_api_key_invalid'] = True
+            logger.warning("API key invalid flag set in parsed_data")
 
         logger.info("--- Finished Receipt Extraction ---")
         return filepath, filename_or_error, parsed_data, file_type

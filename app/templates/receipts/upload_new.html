@@ -490,15 +490,23 @@ async function submitForm(formData, password = null) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
             } else {
-                progressDiv.className = 'alert alert-warning';
-                progressMessage.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i><strong>Warning:</strong> No transactions extracted from receipt';
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalText;
+                // Only show warning if API key is actually invalid
+                if (data.api_key_invalid) {
+                    progressDiv.className = 'alert alert-danger';
+                    progressMessage.innerHTML = '<i class="fas fa-key me-2"></i><strong>API Key Expired:</strong> Your Gemini API key has expired or is invalid. <a href="/settings/api-configuration" class="alert-link">Add a new one in Settings → API Configuration</a> to improve extraction!';
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
 
-                // Auto-dismiss warning after 3 seconds
-                setTimeout(function() {
+                    // Auto-dismiss this warning after 5 seconds (give user time to read and click)
+                    setTimeout(function() {
+                        progressDiv.style.display = 'none';
+                    }, 5000);
+                } else {
+                    // Don't show warning for generic "no transactions found" - could be bad receipt quality
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
                     progressDiv.style.display = 'none';
-                }, 3000);
+                }
             }
         } else {
             // Single receipt - follow redirect

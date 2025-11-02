@@ -350,11 +350,26 @@ def upload_new():
         current_app.logger.info(f"Extracted {len(line_items)} line items from receipt using {extraction_method}")
         current_app.logger.debug(f"Parsed data: {parsed_data}")
 
-        # Check if extraction was successful or if it's a rate limit issue
+        # Check if extraction was successful or if it's a rate limit issue or API key invalid
         rate_limit_hit = parsed_data.get('_rate_limit_429', False)
+        api_key_invalid = parsed_data.get('_api_key_invalid', False)
 
         if not line_items or len(line_items) == 0:
-            if rate_limit_hit:
+            if api_key_invalid:
+                # API key expired/invalid - show helpful message to add API key
+                current_app.logger.warning(f"API key invalid/expired while processing file: {filename}")
+                session['api_key_invalid_message'] = {
+                    'status': 'danger',
+                    'text': '🔑 API Key Expired: Your API key has expired or is invalid. Add a new one in Settings → API Configuration to improve extraction!'
+                }
+                return jsonify({
+                    'line_items': [],
+                    'extraction_method': 'ocr',
+                    'api_key_invalid': True,
+                    'transaction_count': 0,
+                    'message': 'API key expired. Using OCR-only mode. Add a new API key in Settings for better extraction.'
+                }), 200
+            elif rate_limit_hit:
                 # Rate limit reached - show friendly message but still allow manual entry
                 current_app.logger.warning(f"Rate limit hit while processing file: {filename}")
                 session['rate_limit_message'] = {
