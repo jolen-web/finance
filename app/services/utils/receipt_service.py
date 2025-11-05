@@ -4,7 +4,6 @@ Receipt Processing Service
 Wrapper around existing receipt OCR functionality with enhanced service interface.
 """
 
-from app.services.receipt_ocr import ReceiptOCR
 from app.models import Receipt
 from app import db
 
@@ -14,9 +13,13 @@ class ReceiptService:
 
     @staticmethod
     def process_receipt(file_path, user_id):
-        """Process a receipt image and extract data."""
-        ocr = ReceiptOCR()
-        extracted_data = ocr.extract_receipt_data(file_path)
+        """Process a receipt image and extract data.
+
+        Note: Direct OCR processing delegated to receipt_ocr module.
+        """
+        # Import here to avoid circular dependency
+        from app.services.receipt_ocr import extract_receipt_data
+        extracted_data = extract_receipt_data(file_path)
         return extracted_data
 
     @staticmethod

@@ -57,11 +57,12 @@ def create_app(config_class=Config):
         return User.query.get(int(user_id))
 
     # Register blueprints
-    from app.routes import main, accounts, transactions, categories, backup, backup_view, settings, receipts, ai_categorizer, financial_advisor, tax_assistant, scenario_planner, investments, auth, assets, diag, feedback
+    from app.routes import main, accounts, transactions, categories, backup, backup_view, settings, receipts, ai_categorizer, financial_advisor, tax_assistant, scenario_planner, investments, auth, assets, diag, feedback, financial_consolidated
     app.register_blueprint(main.bp)
-    app.register_blueprint(accounts.bp)
-    app.register_blueprint(transactions.bp)
-    app.register_blueprint(categories.bp)
+    app.register_blueprint(financial_consolidated.bp)  # New consolidated financial blueprint
+    app.register_blueprint(accounts.bp)  # Legacy - will deprecate after migration
+    app.register_blueprint(transactions.bp)  # Legacy - will deprecate after migration
+    app.register_blueprint(categories.bp)  # Legacy - will deprecate after migration
     app.register_blueprint(backup.bp)
     app.register_blueprint(backup_view.bp_view)
     app.register_blueprint(settings.bp)
