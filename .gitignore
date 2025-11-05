@@ -1,16 +1,58 @@
-
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
 # Environment variables
 .env
+.env.local
+.env.*.local
 
 # Database
 data/*.db
+data/finance.db
+*.sqlite
+*.sqlite3
 
-# Temporary receipt files
+# Temporary files
 data/receipts/temp/
+/tmp/
+*.tmp
+*.bak
 
 # cc-sessions runtime files
 sessions/sessions-state.json
@@ -18,5 +60,24 @@ sessions/package.json
 sessions/transcripts/
 sessions/.archived/
 
+# Secrets
 .gemini/
 gha-creds-*.json
+*.key
+*.pem
+secrets/
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
