@@ -247,15 +247,31 @@ def dashboard_preferences():
 @login_required
 def regex_patterns():
     from app.models import RegexPattern
-    patterns = RegexPattern.query.filter_by(user_id=current_user.id).order_by(RegexPattern.created_at.desc()).all()
-    
+
+    # Get sort parameter from query string
+    sort_by = request.args.get('sort', 'effectiveness')  # effectiveness, created, name, used
+
+    if sort_by == 'effectiveness':
+        patterns = RegexPattern.query.filter_by(user_id=current_user.id).order_by(RegexPattern.effectiveness_score.desc(), RegexPattern.created_at.desc()).all()
+    elif sort_by == 'created':
+        patterns = RegexPattern.query.filter_by(user_id=current_user.id).order_by(RegexPattern.created_at.desc()).all()
+    elif sort_by == 'used':
+        patterns = RegexPattern.query.filter_by(user_id=current_user.id).order_by(RegexPattern.last_used.desc().nullslast()).all()
+    else:
+        patterns = RegexPattern.query.filter_by(user_id=current_user.id).order_by(RegexPattern.effectiveness_score.desc()).all()
+
     if request.method == 'POST':
         action = request.form.get('action')
-        
+
         if action == 'add' or action == 'edit':
             pattern_id = request.form.get('pattern_id')
-            pattern_str = request.form.get('pattern').strip()
-            account_type = request.form.get('account_type')
+            pattern_str = request.form.get('pattern', '').strip()
+            description = request.form.get('description', '').strip()
+            pattern_type = request.form.get('pattern_type', '').strip()
+            test_string = request.form.get('test_string', '').strip()
+            expected_result = request.form.get('expected_result', '').strip()
+            account_type = request.form.get('account_type', '').strip()
+            is_active = request.form.get('is_active') == 'on'
 
             try:
                 confidence_score = float(request.form.get('confidence_score', 0.5))
@@ -266,42 +282,124 @@ def regex_patterns():
             if not pattern_str:
                 flash('Regex pattern cannot be empty.', 'danger')
                 return redirect(url_for('settings.regex_patterns'))
-            
-            if pattern_id: # Edit existing
+
+            # Validate regex pattern
+            import re
+            try:
+                re.compile(pattern_str)
+            except re.error as e:
+                flash(f'Invalid regex pattern: {str(e)}', 'danger')
+                return redirect(url_for('settings.regex_patterns'))
+
+            if pattern_id:  # Edit existing
                 regex_pattern = RegexPattern.query.get_or_404(pattern_id)
                 if regex_pattern.user_id != current_user.id:
                     flash('Access denied.', 'danger')
                     return redirect(url_for('settings.regex_patterns'))
+
+                # Don't allow editing example patterns
+                if regex_pattern.is_example:
+                    flash('Cannot edit pre-populated example patterns. Duplicate them instead.', 'danger')
+                    return redirect(url_for('settings.regex_patterns'))
+
                 regex_pattern.pattern = pattern_str
+                regex_pattern.description = description if description else None
+                regex_pattern.pattern_type = pattern_type if pattern_type else None
+                regex_pattern.test_string = test_string if test_string else None
+                regex_pattern.expected_result = expected_result if expected_result else None
                 regex_pattern.account_type = account_type if account_type else None
                 regex_pattern.confidence_score = confidence_score
+                regex_pattern.is_active = is_active
                 flash('Regex pattern updated successfully!', 'success')
-            else: # Add new
+            else:  # Add new
                 regex_pattern = RegexPattern(
                     user_id=current_user.id,
                     pattern=pattern_str,
+                    description=description if description else None,
+                    pattern_type=pattern_type if pattern_type else None,
+                    test_string=test_string if test_string else None,
+                    expected_result=expected_result if expected_result else None,
                     account_type=account_type if account_type else None,
-                    confidence_score=confidence_score
+                    confidence_score=confidence_score,
+                    is_active=is_active
                 )
                 db.session.add(regex_pattern)
                 flash('Regex pattern added successfully!', 'success')
-            
+
             db.session.commit()
             return redirect(url_for('settings.regex_patterns'))
-            
+
         elif action == 'delete':
             pattern_id = request.form.get('pattern_id')
             regex_pattern = RegexPattern.query.get_or_404(pattern_id)
             if regex_pattern.user_id != current_user.id:
                 flash('Access denied.', 'danger')
                 return redirect(url_for('settings.regex_patterns'))
-            
+
+            # Don't allow deleting example patterns
+            if regex_pattern.is_example:
+                flash('Cannot delete pre-populated example patterns. Disable them instead.', 'danger')
+                return redirect(url_for('settings.regex_patterns'))
+
             db.session.delete(regex_pattern)
             db.session.commit()
             flash('Regex pattern deleted successfully!', 'success')
             return redirect(url_for('settings.regex_patterns'))
 
-    return render_template('settings/regex_patterns.html', patterns=patterns)
+        elif action == 'toggle_active':
+            pattern_id = request.form.get('pattern_id')
+            regex_pattern = RegexPattern.query.get_or_404(pattern_id)
+            if regex_pattern.user_id != current_user.id:
+                flash('Access denied.', 'danger')
+                return redirect(url_for('settings.regex_patterns'))
+
+            regex_pattern.is_active = not regex_pattern.is_active
+            db.session.commit()
+            status = 'enabled' if regex_pattern.is_active else 'disabled'
+            flash(f'Pattern {status} successfully!', 'success')
+            return redirect(url_for('settings.regex_patterns'))
+
+        elif action == 'duplicate':
+            pattern_id = request.form.get('pattern_id')
+            original_pattern = RegexPattern.query.get_or_404(pattern_id)
+            if original_pattern.user_id != current_user.id:
+                flash('Access denied.', 'danger')
+                return redirect(url_for('settings.regex_patterns'))
+
+            new_pattern = RegexPattern(
+                user_id=current_user.id,
+                pattern=original_pattern.pattern,
+                description=f"{original_pattern.description} (Copy)" if original_pattern.description else "Pattern Copy",
+                pattern_type=original_pattern.pattern_type,
+                test_string=original_pattern.test_string,
+                expected_result=original_pattern.expected_result,
+                account_type=original_pattern.account_type,
+                confidence_score=original_pattern.confidence_score,
+                is_active=original_pattern.is_active,
+                is_example=False
+            )
+            db.session.add(new_pattern)
+            db.session.commit()
+            flash('Pattern duplicated successfully!', 'success')
+            return redirect(url_for('settings.regex_patterns'))
+
+    # Count patterns by type and status
+    total_patterns = len(patterns)
+    active_patterns = len([p for p in patterns if p.is_active])
+    example_patterns = len([p for p in patterns if p.is_example])
+    custom_patterns = len([p for p in patterns if not p.is_example])
+
+    # Get pattern types for filter
+    pattern_types = sorted(set(p.pattern_type for p in patterns if p.pattern_type))
+
+    return render_template('settings/regex_patterns.html',
+                         patterns=patterns,
+                         sort_by=sort_by,
+                         total_patterns=total_patterns,
+                         active_patterns=active_patterns,
+                         example_patterns=example_patterns,
+                         custom_patterns=custom_patterns,
+                         pattern_types=pattern_types)
 
 
 @bp.route('/api-configuration', methods=['GET', 'POST'])
@@ -359,3 +457,9 @@ def api_configuration():
 
     has_gemini_key = current_user.gemini_api_key is not None and current_user.gemini_api_key.strip() != ''
     return render_template('settings/api_configuration.html', has_gemini_key=has_gemini_key)
+
+@bp.route('/workflows')
+@login_required
+def workflows():
+    """View all available workflows and features"""
+    return render_template('settings/workflows.html')

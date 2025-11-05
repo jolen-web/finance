@@ -254,6 +254,9 @@
             </div>
             <div class="card-body">
                 <div class="list-group list-group-flush">
+                    <a href="{{ url_for('settings.workflows') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-book"></i> Workflows & Features
+                    </a>
                     <a href="{{ url_for('settings.api_configuration') }}" class="list-group-item list-group-item-action">
                         <i class="fas fa-key"></i> API Configuration
                         {% if has_gemini_key %}<span class="badge bg-success float-end">Configured</span>{% endif %}

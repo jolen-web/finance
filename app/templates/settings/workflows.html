@@ -1,0 +1,611 @@
+{% extends "base.html" %}
+
+{% block title %}Workflows & Features - Finance Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1><i class="fas fa-book"></i> Workflows & Features Guide</h1>
+        <p class="text-muted">Learn about all the features and workflows available in your Finance Tracker</p>
+    </div>
+</div>
+
+<!-- Getting Started Workflow -->
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-rocket"></i> Getting Started Workflow</h5>
+    </div>
+    <div class="card-body">
+        <p>Follow these steps to set up your Finance Tracker and start tracking your finances:</p>
+        <div class="timeline">
+            <div class="timeline-item">
+                <div class="timeline-marker bg-success text-white"><i class="fas fa-1"></i></div>
+                <div class="timeline-content">
+                    <h6>Create Your First Account</h6>
+                    <p class="text-muted mb-2">Start by creating accounts to track your money across different sources.</p>
+                    <ul class="small">
+                        <li><strong>Checking Account:</strong> For regular spending and deposits</li>
+                        <li><strong>Savings Account:</strong> For money you want to save</li>
+                        <li><strong>Credit Card:</strong> To track credit card balances</li>
+                        <li><strong>Cash:</strong> For physical cash you carry</li>
+                        <li><strong>Digital Wallet:</strong> For mobile payment apps</li>
+                    </ul>
+                    <a href="{{ url_for('main.accounts') }}" class="btn btn-sm btn-primary mt-2">
+                        <i class="fas fa-plus"></i> Create Account
+                    </a>
+                </div>
+            </div>
+
+            <div class="timeline-item">
+                <div class="timeline-marker bg-success text-white"><i class="fas fa-2"></i></div>
+                <div class="timeline-content">
+                    <h6>Add Your First Transaction</h6>
+                    <p class="text-muted mb-2">Record income and expenses to track your spending patterns.</p>
+                    <ul class="small">
+                        <li>Use the <strong>Quick Add</strong> button for fast entry</li>
+                        <li>Choose a <strong>category</strong> for automatic analysis</li>
+                        <li>Add <strong>notes</strong> for additional context</li>
+                        <li>Upload <strong>receipts</strong> with photos</li>
+                    </ul>
+                    <a href="{{ url_for('main.transactions') }}" class="btn btn-sm btn-primary mt-2">
+                        <i class="fas fa-plus"></i> Add Transaction
+                    </a>
+                </div>
+            </div>
+
+            <div class="timeline-item">
+                <div class="timeline-marker bg-success text-white"><i class="fas fa-3"></i></div>
+                <div class="timeline-content">
+                    <h6>Customize Your Settings</h6>
+                    <p class="text-muted mb-2">Personalize your experience by configuring your preferences.</p>
+                    <ul class="small">
+                        <li><strong>Currency:</strong> Choose your display currency</li>
+                        <li><strong>Dashboard:</strong> Select which sections to display</li>
+                        <li><strong>Categories:</strong> Create custom income and expense categories</li>
+                        <li><strong>Theme:</strong> Switch between light and dark mode</li>
+                    </ul>
+                    <a href="{{ url_for('settings.index') }}" class="btn btn-sm btn-primary mt-2">
+                        <i class="fas fa-cog"></i> Go to Settings
+                    </a>
+                </div>
+            </div>
+
+            <div class="timeline-item">
+                <div class="timeline-marker bg-success text-white"><i class="fas fa-4"></i></div>
+                <div class="timeline-content">
+                    <h6>View Your Dashboard</h6>
+                    <p class="text-muted mb-2">See your financial overview at a glance.</p>
+                    <ul class="small">
+                        <li><strong>Net Worth:</strong> Total assets minus liabilities</li>
+                        <li><strong>Account Summary:</strong> Balance across all accounts</li>
+                        <li><strong>Spending Charts:</strong> Visualize where your money goes</li>
+                        <li><strong>Recent Transactions:</strong> Latest activity in your accounts</li>
+                    </ul>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-sm btn-primary mt-2">
+                        <i class="fas fa-chart-line"></i> View Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Core Features -->
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="fas fa-layer-group"></i> Core Features</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <!-- Accounts -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-primary mb-2"><i class="fas fa-university"></i> Accounts</h6>
+                    <p class="small text-muted mb-3">Track multiple financial accounts and their balances.</p>
+                    <ul class="small mb-3">
+                        <li>Create checking, savings, credit card, cash, and custom accounts</li>
+                        <li>Track account balances in real-time</li>
+                        <li>Manage custom account types in settings</li>
+                        <li>View account transaction history</li>
+                    </ul>
+                    <a href="{{ url_for('main.accounts') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-link"></i> Go to Accounts
+                    </a>
+                </div>
+            </div>
+
+            <!-- Transactions -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-primary mb-2"><i class="fas fa-exchange-alt"></i> Transactions</h6>
+                    <p class="small text-muted mb-3">Record and manage all your income and expenses.</p>
+                    <ul class="small mb-3">
+                        <li>Add, edit, and delete transactions</li>
+                        <li>Categorize transactions for analysis</li>
+                        <li>Mark transactions as cleared or reconciled</li>
+                        <li>Quick-add feature for fast entry</li>
+                        <li>Bulk operations for managing multiple transactions</li>
+                    </ul>
+                    <a href="{{ url_for('main.transactions') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-link"></i> Go to Transactions
+                    </a>
+                </div>
+            </div>
+
+            <!-- Assets -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-primary mb-2"><i class="fas fa-home"></i> Assets</h6>
+                    <p class="small text-muted mb-3">Track valuable items and property you own.</p>
+                    <ul class="small mb-3">
+                        <li>Record property, vehicles, and other valuables</li>
+                        <li>Track asset values over time</li>
+                        <li>Categorize assets by type</li>
+                        <li>Add notes and details for each asset</li>
+                    </ul>
+                    <a href="{{ url_for('main.assets') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-link"></i> Go to Assets
+                    </a>
+                </div>
+            </div>
+
+            <!-- Investments -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-primary mb-2"><i class="fas fa-chart-line"></i> Investments</h6>
+                    <p class="small text-muted mb-3">Manage your investment portfolio and performance.</p>
+                    <ul class="small mb-3">
+                        <li>Track stocks, bonds, mutual funds, and cryptocurrencies</li>
+                        <li>Monitor portfolio performance</li>
+                        <li>Track gains and losses</li>
+                        <li>Set investment goals</li>
+                    </ul>
+                    <a href="{{ url_for('main.investments') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-link"></i> Go to Investments
+                    </a>
+                </div>
+            </div>
+
+            <!-- Receipts -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-primary mb-2"><i class="fas fa-receipt"></i> Receipts</h6>
+                    <p class="small text-muted mb-3">Upload and extract data from receipts using AI-powered OCR.</p>
+                    <ul class="small mb-3">
+                        <li>Upload receipt images (JPG, PNG, PDF)</li>
+                        <li>AI automatically extracts transaction details</li>
+                        <li>Configurable Gemini API keys for OCR</li>
+                        <li>Store receipt history for future reference</li>
+                    </ul>
+                    <a href="{{ url_for('main.receipts') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-link"></i> Go to Receipts
+                    </a>
+                </div>
+            </div>
+
+            <!-- Categories -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-primary mb-2"><i class="fas fa-tags"></i> Categories</h6>
+                    <p class="small text-muted mb-3">Organize transactions with hierarchical categories.</p>
+                    <ul class="small mb-3">
+                        <li>Create custom income and expense categories</li>
+                        <li>Build subcategory hierarchies</li>
+                        <li>Organize for automatic categorization</li>
+                        <li>View spending breakdown by category</li>
+                    </ul>
+                    <a href="{{ url_for('settings.index') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-link"></i> Manage Categories
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Advanced Tools -->
+<div class="card mb-4">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0"><i class="fas fa-magic"></i> Advanced Tools</h5>
+    </div>
+    <div class="card-body">
+        <p class="mb-4">Unlock deeper insights with these powerful financial tools:</p>
+
+        <div class="row">
+            <!-- AI Categorizer -->
+            <div class="col-md-6 mb-4">
+                <div class="tool-box p-3 border rounded border-warning">
+                    <h6 class="text-warning mb-2"><i class="fas fa-robot"></i> AI Transaction Categorizer</h6>
+                    <p class="small text-muted mb-3">Automatically categorize transactions based on merchant, amount, and history.</p>
+                    <ul class="small mb-3">
+                        <li>Machine learning-powered categorization</li>
+                        <li>Create custom categorization rules</li>
+                        <li>Learn from your patterns over time</li>
+                        <li>Improve accuracy with feedback</li>
+                    </ul>
+                    <div class="alert alert-info small mb-0">
+                        <i class="fas fa-lightbulb"></i> Use this to automatically tag transactions as you import them
+                    </div>
+                </div>
+            </div>
+
+            <!-- Financial Advisor -->
+            <div class="col-md-6 mb-4">
+                <div class="tool-box p-3 border rounded border-warning">
+                    <h6 class="text-warning mb-2"><i class="fas fa-brain"></i> Financial Advisor</h6>
+                    <p class="small text-muted mb-3">Get AI-powered insights about your spending and financial health.</p>
+                    <ul class="small mb-3">
+                        <li>Analyze your spending patterns</li>
+                        <li>Identify areas for savings</li>
+                        <li>Track trends over time</li>
+                        <li>Get personalized recommendations</li>
+                    </ul>
+                    <div class="alert alert-info small mb-0">
+                        <i class="fas fa-lightbulb"></i> Get insights into your financial habits and opportunities to save
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tax Assistant -->
+            <div class="col-md-6 mb-4">
+                <div class="tool-box p-3 border rounded border-warning">
+                    <h6 class="text-warning mb-2"><i class="fas fa-file-invoice-dollar"></i> Tax Assistant</h6>
+                    <p class="small text-muted mb-3">Prepare for tax season with organized categorization and reporting.</p>
+                    <ul class="small mb-3">
+                        <li>Tag deductible transactions</li>
+                        <li>Year-end tax summary reports</li>
+                        <li>Income and expense analysis</li>
+                        <li>Export tax-ready data</li>
+                    </ul>
+                    <div class="alert alert-info small mb-0">
+                        <i class="fas fa-lightbulb"></i> Organize your finances throughout the year for easier tax filing
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scenario Planner -->
+            <div class="col-md-6 mb-4">
+                <div class="tool-box p-3 border rounded border-warning">
+                    <h6 class="text-warning mb-2"><i class="fas fa-crystal-ball"></i> Scenario Planner</h6>
+                    <p class="small text-muted mb-3">Explore different financial futures and compare scenarios.</p>
+                    <ul class="small mb-3">
+                        <li>Create financial projections</li>
+                        <li>Compare different scenarios side-by-side</li>
+                        <li>Test budget changes</li>
+                        <li>Plan for major life events</li>
+                    </ul>
+                    <div class="alert alert-info small mb-0">
+                        <i class="fas fa-lightbulb"></i> Plan ahead and make informed financial decisions
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Organization & Customization -->
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Organization & Customization</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <!-- Regex Patterns -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-secondary mb-2"><i class="fas fa-filter"></i> Regex Patterns</h6>
+                    <p class="small text-muted mb-3">Create custom patterns for automatic data extraction from receipts.</p>
+                    <ul class="small mb-3">
+                        <li>Define custom regex patterns for your merchants</li>
+                        <li>Test patterns before saving</li>
+                        <li>Organize patterns by type (date, amount, merchant)</li>
+                        <li>Track pattern effectiveness scores</li>
+                    </ul>
+                    <a href="{{ url_for('settings.regex_patterns') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-cog"></i> Manage Patterns
+                    </a>
+                </div>
+            </div>
+
+            <!-- Dashboard Preferences -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-secondary mb-2"><i class="fas fa-cog"></i> Dashboard Preferences</h6>
+                    <p class="small text-muted mb-3">Customize which dashboard sections are visible to you.</p>
+                    <ul class="small mb-3">
+                        <li>Toggle account summary display</li>
+                        <li>Show/hide transaction history</li>
+                        <li>Toggle investment widget</li>
+                        <li>Control asset visibility</li>
+                    </ul>
+                    <a href="{{ url_for('settings.dashboard_preferences') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-cog"></i> Configure Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Account Types -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-secondary mb-2"><i class="fas fa-list"></i> Account Types</h6>
+                    <p class="small text-muted mb-3">Create custom account types for your unique financial setup.</p>
+                    <ul class="small mb-3">
+                        <li>Default types: Checking, Savings, Credit Card, Cash, Digital Wallet</li>
+                        <li>Add custom account types</li>
+                        <li>Delete unused types</li>
+                        <li>Use in account creation</li>
+                    </ul>
+                    <a href="{{ url_for('settings.account_types') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-cog"></i> Manage Types
+                    </a>
+                </div>
+            </div>
+
+            <!-- API Configuration -->
+            <div class="col-md-6 mb-4">
+                <div class="feature-box p-3 border rounded">
+                    <h6 class="text-secondary mb-2"><i class="fas fa-key"></i> API Configuration</h6>
+                    <p class="small text-muted mb-3">Configure Gemini API keys for receipt OCR functionality.</p>
+                    <ul class="small mb-3">
+                        <li>Add your own Gemini API key for OCR</li>
+                        <li>Encrypted storage of API credentials</li>
+                        <li>Test API key connectivity</li>
+                        <li>View API expiration warnings</li>
+                    </ul>
+                    <a href="{{ url_for('settings.api_configuration') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-cog"></i> Configure API Keys
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tips & Tricks -->
+<div class="card mb-4">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Tips & Tricks</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <h6 class="text-success"><i class="fas fa-check-circle"></i> Transaction Management</h6>
+                <ul class="small">
+                    <li><strong>Quick Add:</strong> Use the navbar button for fast entry</li>
+                    <li><strong>Bulk Operations:</strong> Select multiple transactions for batch actions</li>
+                    <li><strong>Search & Filter:</strong> Find transactions by date, amount, category, or note</li>
+                    <li><strong>Reconcile:</strong> Mark transactions as cleared when they appear in your bank statement</li>
+                </ul>
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <h6 class="text-success"><i class="fas fa-check-circle"></i> Receipt Processing</h6>
+                <ul class="small">
+                    <li><strong>Clear Photos:</strong> Take well-lit, straight photos for better OCR accuracy</li>
+                    <li><strong>Custom Patterns:</strong> Create regex patterns for merchants you shop at frequently</li>
+                    <li><strong>API Key:</strong> Use your own API key for faster processing</li>
+                    <li><strong>Batch Upload:</strong> Upload multiple receipts at once</li>
+                </ul>
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <h6 class="text-success"><i class="fas fa-check-circle"></i> Data Organization</h6>
+                <ul class="small">
+                    <li><strong>Hierarchical Categories:</strong> Create parent and subcategories for better organization</li>
+                    <li><strong>Consistent Naming:</strong> Use consistent category names for better analytics</li>
+                    <li><strong>Account Grouping:</strong> Organize accounts by type or institution</li>
+                    <li><strong>Regular Review:</strong> Review your categories and patterns monthly</li>
+                </ul>
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <h6 class="text-success"><i class="fas fa-check-circle"></i> Dashboard Usage</h6>
+                <ul class="small">
+                    <li><strong>Customize View:</strong> Show only the sections you care about</li>
+                    <li><strong>Default Page:</strong> Set your preferred landing page in settings</li>
+                    <li><strong>Dark Mode:</strong> Switch to dark theme for reduced eye strain</li>
+                    <li><strong>Currency Display:</strong> Change currency symbol in settings</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FAQ Section -->
+<div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0"><i class="fas fa-question-circle"></i> Frequently Asked Questions</h5>
+    </div>
+    <div class="card-body">
+        <div class="accordion" id="workflowsAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                        How do I get started with the Finance Tracker?
+                    </button>
+                </h2>
+                <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#workflowsAccordion">
+                    <div class="accordion-body">
+                        <p>Follow the <strong>Getting Started Workflow</strong> section above. In summary:</p>
+                        <ol>
+                            <li>Create your first account (Checking, Savings, Credit Card, etc.)</li>
+                            <li>Add some transactions to record your spending</li>
+                            <li>Customize your settings (currency, categories, dashboard)</li>
+                            <li>View your dashboard to see your financial overview</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                        What does the Gemini API key do?
+                    </button>
+                </h2>
+                <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#workflowsAccordion">
+                    <div class="accordion-body">
+                        <p>The Gemini API key enables the <strong>Receipt OCR (Optical Character Recognition)</strong> feature. It allows the app to:</p>
+                        <ul>
+                            <li>Automatically extract text from receipt photos</li>
+                            <li>Identify transaction amounts and merchants</li>
+                            <li>Create transactions from receipt images</li>
+                        </ul>
+                        <p>You can configure your own API key in <a href="{{ url_for('settings.api_configuration') }}">Settings > API Configuration</a>.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                        What are regex patterns used for?
+                    </button>
+                </h2>
+                <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#workflowsAccordion">
+                    <div class="accordion-body">
+                        <p>Regex patterns help <strong>extract specific information from receipt text</strong>. They're used to:</p>
+                        <ul>
+                            <li>Extract dates in various formats</li>
+                            <li>Find transaction amounts with currency symbols</li>
+                            <li>Identify merchant names</li>
+                            <li>Extract line items from receipts</li>
+                        </ul>
+                        <p>Create and test patterns in <a href="{{ url_for('settings.regex_patterns') }}">Settings > Regex Patterns</a>.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                        How do I organize my categories effectively?
+                    </button>
+                </h2>
+                <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#workflowsAccordion">
+                    <div class="accordion-body">
+                        <p>Use a hierarchical category structure:</p>
+                        <ul>
+                            <li><strong>Parent Categories:</strong> Broad categories like "Food", "Transportation", "Housing"</li>
+                            <li><strong>Subcategories:</strong> More specific like "Groceries", "Restaurants" under "Food"</li>
+                            <li><strong>Consistency:</strong> Use the same names consistently when entering transactions</li>
+                            <li><strong>Separate Income/Expense:</strong> Keep income and expense categories separate</li>
+                        </ul>
+                        <p>Manage your categories in <a href="{{ url_for('settings.index') }}">Settings</a>.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                        Can I change the currency display?
+                    </button>
+                </h2>
+                <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#workflowsAccordion">
+                    <div class="accordion-body">
+                        <p>Yes! The currency setting controls which <strong>symbol is displayed</strong> throughout the application.</p>
+                        <p><strong>Important note:</strong> Changing the currency only updates the display symbol, not the actual values. All amounts remain in their original numeric values.</p>
+                        <p>Change your currency in <a href="{{ url_for('settings.index') }}">Settings > Currency Settings</a>.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">
+                        What's the difference between "Cleared" and "Reconciled"?
+                    </button>
+                </h2>
+                <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#workflowsAccordion">
+                    <div class="accordion-body">
+                        <ul>
+                            <li><strong>Cleared:</strong> The transaction has been processed but not yet verified against your bank statement</li>
+                            <li><strong>Reconciled:</strong> The transaction matches your bank statement and is verified correct</li>
+                        </ul>
+                        <p>Use the reconciliation feature to ensure your records match your actual bank accounts.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Navigation -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-compass"></i> Quick Navigation</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 text-center mb-3">
+                <a href="{{ url_for('main.index') }}" class="btn btn-light btn-block w-100 py-3">
+                    <div class="h6 mb-0"><i class="fas fa-chart-line fa-2x text-primary mb-2"></i></div>
+                    Dashboard
+                </a>
+            </div>
+            <div class="col-md-3 text-center mb-3">
+                <a href="{{ url_for('main.accounts') }}" class="btn btn-light btn-block w-100 py-3">
+                    <div class="h6 mb-0"><i class="fas fa-university fa-2x text-info mb-2"></i></div>
+                    Accounts
+                </a>
+            </div>
+            <div class="col-md-3 text-center mb-3">
+                <a href="{{ url_for('main.transactions') }}" class="btn btn-light btn-block w-100 py-3">
+                    <div class="h6 mb-0"><i class="fas fa-exchange-alt fa-2x text-success mb-2"></i></div>
+                    Transactions
+                </a>
+            </div>
+            <div class="col-md-3 text-center mb-3">
+                <a href="{{ url_for('settings.index') }}" class="btn btn-light btn-block w-100 py-3">
+                    <div class="h6 mb-0"><i class="fas fa-cog fa-2x text-secondary mb-2"></i></div>
+                    Settings
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    min-width: 50px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.timeline-content {
+    flex: 1;
+}
+
+.feature-box:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.3s ease;
+}
+
+.tool-box {
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tool-box:hover {
+    border-color: #ffc107 !important;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+}
+</style>
+{% endblock %}
