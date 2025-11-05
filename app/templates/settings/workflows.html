@@ -30,7 +30,7 @@
                         <li><strong>Cash:</strong> For physical cash you carry</li>
                         <li><strong>Digital Wallet:</strong> For mobile payment apps</li>
                     </ul>
-                    <a href="{{ url_for('accounts.index') }}" class="btn btn-sm btn-primary mt-2">
+                    <a href="{{ url_for('accounts.list_accounts') }}" class="btn btn-sm btn-primary mt-2">
                         <i class="fas fa-plus"></i> Create Account
                     </a>
                 </div>
@@ -47,7 +47,7 @@
                         <li>Add <strong>notes</strong> for additional context</li>
                         <li>Upload <strong>receipts</strong> with photos</li>
                     </ul>
-                    <a href="{{ url_for('transactions.index') }}" class="btn btn-sm btn-primary mt-2">
+                    <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-sm btn-primary mt-2">
                         <i class="fas fa-plus"></i> Add Transaction
                     </a>
                 </div>
@@ -143,7 +143,7 @@
                         <li>Categorize assets by type</li>
                         <li>Add notes and details for each asset</li>
                     </ul>
-                    <a href="{{ url_for('assets.index') }}" class="btn btn-sm btn-outline-primary">
+                    <a href="{{ url_for('assets.list_assets') }}" class="btn btn-sm btn-outline-primary">
                         <i class="fas fa-link"></i> Go to Assets
                     </a>
                 </div>
@@ -545,13 +545,13 @@
                 </a>
             </div>
             <div class="col-md-3 text-center mb-3">
-                <a href="{{ url_for('accounts.index') }}" class="btn btn-light btn-block w-100 py-3">
+                <a href="{{ url_for('accounts.list_accounts') }}" class="btn btn-light btn-block w-100 py-3">
                     <div class="h6 mb-0"><i class="fas fa-university fa-2x text-info mb-2"></i></div>
                     Accounts
                 </a>
             </div>
             <div class="col-md-3 text-center mb-3">
-                <a href="{{ url_for('transactions.index') }}" class="btn btn-light btn-block w-100 py-3">
+                <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-light btn-block w-100 py-3">
                     <div class="h6 mb-0"><i class="fas fa-exchange-alt fa-2x text-success mb-2"></i></div>
                     Transactions
                 </a>
