@@ -301,38 +301,70 @@ def upload_new():
     """Upload receipt and create new transaction"""
     if request.method == 'POST':
         if 'receipt_file' not in request.files:
-            flash('No file selected', 'danger')
-            return redirect(request.url)
+            return jsonify({
+                'error': 'No file selected',
+                'error_type': 'NO_FILE',
+                'action': 'SELECT_FILE'
+            }), 400
 
         file = request.files['receipt_file']
         account_id = request.form.get('account_id')
         pdf_password = request.form.get('pdf_password')
 
         if not account_id:
-            flash('Please select an account', 'danger')
-            return redirect(request.url)
+            return jsonify({
+                'error': 'Please select an account',
+                'error_type': 'NO_ACCOUNT',
+                'action': 'SELECT_ACCOUNT'
+            }), 400
 
         if file.filename == '':
-            flash('No file selected', 'danger')
-            return redirect(request.url)
+            return jsonify({
+                'error': 'No file selected',
+                'error_type': 'NO_FILE',
+                'action': 'SELECT_FILE'
+            }), 400
 
         agent = ReceiptOCRAgent()
 
-        # Extract data without creating database records yet
-        # Pass user object so extraction can use their personal API key if configured
-        filepath, filename, parsed_data, file_type = agent.extract_receipt_data(file, current_user.id, 'temp', password=pdf_password, user=current_user)
+        try:
+            # Extract data without creating database records yet
+            # Pass user object so extraction can use their personal API key if configured
+            filepath, filename, parsed_data, file_type = agent.extract_receipt_data(file, current_user.id, 'temp', password=pdf_password, user=current_user)
+        except Exception as e:
+            # CRITICAL: Catch any unhandled exceptions from extraction to prevent worker crash
+            current_app.logger.error(f"UNHANDLED EXCEPTION in extract_receipt_data: {type(e).__name__}: {str(e)}", exc_info=True)
+            return jsonify({
+                'error': f'Error processing receipt: {str(e)[:100]}',
+                'error_type': 'EXTRACTION_ERROR',
+                'error_code': 'EXTRACTION_ERROR'
+            }), 500
 
         if not filepath:
-            # Check if PDF password is required
-            if parsed_data == 'PDF_PASSWORD_REQUIRED':
-                return jsonify({'error': 'PDF_PASSWORD_REQUIRED'}), 200
+            # parsed_data is now an error dict with structured error info
+            if isinstance(parsed_data, dict) and 'error_code' in parsed_data:
+                # Structured error from service
+                error_code = parsed_data.get('error_code')
 
-            # Check for password errors
-            if 'password' in str(parsed_data).lower():
-                return jsonify({'error': parsed_data}), 200
+                # Handle specific error codes
+                if error_code == 'PDF_PASSWORD_REQUIRED':
+                    return jsonify({'error': 'PDF_PASSWORD_REQUIRED'}), 200
 
-            flash(f'Error processing receipt: {parsed_data}', 'danger')
-            return redirect(request.url)
+                # Return the full structured error
+                current_app.logger.warning(f"Receipt extraction error: {parsed_data['error_type']} - {parsed_data['message']}")
+                return jsonify({
+                    'error': parsed_data.get('user_message', parsed_data.get('message')),
+                    'error_type': parsed_data.get('error_type'),
+                    'error_code': error_code,
+                    'action': parsed_data.get('action')
+                }), 200
+            else:
+                # Legacy error format (shouldn't happen with updated code)
+                current_app.logger.error(f"Unexpected error format: {parsed_data}")
+                return jsonify({
+                    'error': f'Error processing receipt: {parsed_data}',
+                    'error_type': 'UNKNOWN_ERROR'
+                }), 400
 
         # Store file info in session for later receipt creation
         session['pending_receipt'] = {
@@ -353,23 +385,25 @@ def upload_new():
         # Check if extraction was successful or if it's a rate limit issue or API key invalid
         rate_limit_hit = parsed_data.get('_rate_limit_429', False)
         api_key_invalid = parsed_data.get('_api_key_invalid', False)
+        gemini_error = parsed_data.get('_gemini_error', None)
+
+        # Build warning/error info if Gemini failed
+        gemini_warning = None
+        if api_key_invalid:
+            gemini_warning = {
+                'type': 'API_KEY_INVALID',
+                'message': '🔑 Gemini API Key Invalid or Expired\n\nYour API key is no longer valid. AI extraction failed.\n\nYou can:\n• Fix your API key in Settings → API Configuration\n• Or continue with OCR-only extraction',
+                'action_url': '/settings/api-configuration'
+            }
+        elif gemini_error:
+            gemini_warning = {
+                'type': 'GEMINI_ERROR',
+                'message': f'⚠️ AI Extraction Failed: {gemini_error}\n\nFalling back to OCR mode.',
+                'action_url': None
+            }
 
         if not line_items or len(line_items) == 0:
-            if api_key_invalid:
-                # API key expired/invalid - show helpful message to add API key
-                current_app.logger.warning(f"API key invalid/expired while processing file: {filename}")
-                session['api_key_invalid_message'] = {
-                    'status': 'danger',
-                    'text': '🔑 API Key Expired: Your API key has expired or is invalid. Add a new one in Settings → API Configuration to improve extraction!'
-                }
-                return jsonify({
-                    'line_items': [],
-                    'extraction_method': 'ocr',
-                    'api_key_invalid': True,
-                    'transaction_count': 0,
-                    'message': 'API key expired. Using OCR-only mode. Add a new API key in Settings for better extraction.'
-                }), 200
-            elif rate_limit_hit:
+            if rate_limit_hit:
                 # Rate limit reached - show friendly message but still allow manual entry
                 current_app.logger.warning(f"Rate limit hit while processing file: {filename}")
                 session['rate_limit_message'] = {
@@ -387,16 +421,25 @@ def upload_new():
                 # Normal case - no transactions found
                 error_msg = "Unable to extract any transactions from the uploaded image.\n\nPlease ensure the image is clear and contains visible transaction data, or add transactions manually below."
                 current_app.logger.warning(f"Empty extraction result for file: {filename}")
-                session['rate_limit_message'] = {
-                    'status': 'info',
-                    'text': '📄 No transactions were automatically detected. You can still add them manually below!'
-                }
-                return jsonify({
+                response_data = {
                     'line_items': [],  # Empty - return form for manual entry
                     'extraction_method': extraction_method,
                     'transaction_count': 0,
                     'message': 'No transactions detected. Please add them manually below.'
-                }), 200  # Return 200 so form displays with empty state
+                }
+                # Add Gemini warning if it exists
+                if gemini_warning:
+                    response_data['gemini_warning'] = gemini_warning
+                    session['rate_limit_message'] = {
+                        'status': 'warning',
+                        'text': gemini_warning['message']
+                    }
+                else:
+                    session['rate_limit_message'] = {
+                        'status': 'info',
+                        'text': '📄 No transactions were automatically detected. You can still add them manually below!'
+                    }
+                return jsonify(response_data), 200  # Return 200 so form displays with empty state
 
         # If we have multi-line transactions, use them
         if line_items and len(line_items) > 0:
@@ -404,7 +447,7 @@ def upload_new():
                 statement_info = line_items[0]['_statement_info']
 
         # Always return as line_items for consistent handling
-        return jsonify({
+        response_data = {
             'line_items': [
                 {
                     'date': item['date'].isoformat() if hasattr(item.get('date'), 'isoformat') else str(item.get('date', '')),
@@ -418,7 +461,11 @@ def upload_new():
             'statement_info': statement_info,
             'extraction_method': extraction_method,
             'transaction_count': len(line_items)
-        })
+        }
+        # Add Gemini warning if it exists (even if we have transactions from fallback)
+        if gemini_warning:
+            response_data['gemini_warning'] = gemini_warning
+        return jsonify(response_data)
 
     accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
     currency_info = get_currency_info()

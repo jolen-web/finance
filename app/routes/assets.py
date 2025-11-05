@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from app.models import Asset
 from app import db
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 bp = Blueprint('assets', __name__, url_prefix='/assets')
 
@@ -51,36 +52,21 @@ def new_asset():
             errors.append('Valid asset type is required')
 
         try:
-            current_value = float(current_value)
+            current_value = Decimal(current_value)
             if current_value < 0:
                 errors.append('Current value cannot be negative')
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, InvalidOperation):
             errors.append('Current value must be a valid number')
 
         if purchase_price:
             try:
-                purchase_price = float(purchase_price)
+                purchase_price = Decimal(purchase_price)
                 if purchase_price < 0:
                     errors.append('Purchase price cannot be negative')
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, InvalidOperation):
                 errors.append('Purchase price must be a valid number')
         else:
             purchase_price = None
-
-        # Convert date string to date object
-        if purchase_date:
-            try:
-                purchase_date = datetime.strptime(purchase_date, '%Y-%m-%d').date()
-            except (ValueError, TypeError):
-                errors.append('Purchase date must be in YYYY-MM-DD format')
-                purchase_date = None
-        else:
-            purchase_date = None
-
-        if errors:
-            for error in errors:
-                flash(error, 'danger')
-            return render_template('assets/form.html', asset_types=ASSET_TYPES)
 
         try:
             asset = Asset(
@@ -126,18 +112,18 @@ def edit_asset(id):
             errors.append('Valid asset type is required')
 
         try:
-            current_value = float(current_value)
+            current_value = Decimal(current_value)
             if current_value < 0:
                 errors.append('Current value cannot be negative')
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, InvalidOperation):
             errors.append('Current value must be a valid number')
 
         if purchase_price:
             try:
-                purchase_price = float(purchase_price)
+                purchase_price = Decimal(purchase_price)
                 if purchase_price < 0:
                     errors.append('Purchase price cannot be negative')
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, InvalidOperation):
                 errors.append('Purchase price must be a valid number')
         else:
             purchase_price = None

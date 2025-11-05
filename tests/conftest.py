@@ -1,57 +1,103 @@
+"""Pytest configuration and shared fixtures."""
+
+import os
 import pytest
-from app import create_app, db as _db
-from app.models import User
-from config import Config
-from sqlalchemy.orm import sessionmaker, scoped_session
+from decimal import Decimal
+from app import create_app, db
+from app.models import User, Account, Transaction, Category
+
 
 @pytest.fixture(scope='session')
 def app():
-    """Create and configure a new app instance for the entire test session."""
-    app = create_app(TestConfig)
+    """Create application for testing."""
+    app = create_app()
+    app.config['TESTING'] = True
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    app.config['WTF_CSRF_ENABLED'] = False
+
     with app.app_context():
-        _db.create_all()
+        db.create_all()
         yield app
-        _db.drop_all()
+        db.session.remove()
+        db.drop_all()
 
-class TestConfig(Config):
-    """Test configuration."""
-    TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
-    WTF_CSRF_ENABLED = False
-    SQLALCHEMY_ENGINE_OPTIONS = {}
-
-@pytest.fixture(scope='function')
-def db_session(app):
-    """
-    Creates a new database session for a test, wrapped in a transaction that is
-    rolled back at the end.
-    """
-    with app.app_context():
-        connection = _db.engine.connect()
-        transaction = connection.begin()
-        
-        session_factory = sessionmaker(bind=connection)
-        session = scoped_session(session_factory)
-        
-        _db.session = session
-
-        yield session
-
-        session.remove()
-        transaction.rollback()
-        connection.close()
-
-@pytest.fixture()
-def client(app):
-    """A test client for the app."""
-    return app.test_client()
 
 @pytest.fixture
-def new_user_payload():
-    """Fixture for creating a new user payload."""
-    return {
-        'username': 'testuser',
-        'email': 'test@example.com',
-        'password': 'password',
-        'password_confirm': 'password'
-    }
+def client(app):
+    """Test client for making requests."""
+    return app.test_client()
+
+
+@pytest.fixture
+def runner(app):
+    """CLI runner for testing CLI commands."""
+    return app.test_cli_runner()
+
+
+@pytest.fixture
+def app_context(app):
+    """Application context for database operations."""
+    with app.app_context():
+        yield app
+
+
+@pytest.fixture
+def db_session(app_context):
+    """Database session for tests."""
+    yield db.session
+    db.session.rollback()
+
+
+@pytest.fixture
+def test_user(db_session):
+    """Create a test user."""
+    user = User(
+        username='testuser',
+        email='test@example.com',
+        password_hash='hashed_password'
+    )
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+@pytest.fixture
+def test_account(db_session, test_user):
+    """Create a test account."""
+    account = Account(
+        user_id=test_user.id,
+        name='Test Checking',
+        account_type='checking',
+        current_balance=Decimal('1000.00')
+    )
+    db_session.add(account)
+    db_session.commit()
+    return account
+
+
+@pytest.fixture
+def test_category(db_session, test_user):
+    """Create a test category."""
+    category = Category(
+        user_id=test_user.id,
+        name='Groceries',
+        category_type='expense'
+    )
+    db_session.add(category)
+    db_session.commit()
+    return category
+
+
+@pytest.fixture
+def test_transaction(db_session, test_account, test_category):
+    """Create a test transaction."""
+    transaction = Transaction(
+        account_id=test_account.id,
+        amount=Decimal('25.50'),
+        description='Grocery store',
+        category_id=test_category.id,
+        transaction_type='expense'
+    )
+    db_session.add(transaction)
+    db_session.commit()
+    return transaction

@@ -462,4 +462,9 @@ def api_configuration():
 @login_required
 def workflows():
     """View all available workflows and features"""
-    return render_template('settings/workflows.html')
+    try:
+        return render_template('settings/workflows.html')
+    except Exception as e:
+        current_app.logger.error(f"Error rendering workflows page: {e}", exc_info=True)
+        flash('An error occurred while loading the workflows page.', 'danger')
+        return redirect(url_for('main.index'))

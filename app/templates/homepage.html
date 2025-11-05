@@ -5,7 +5,7 @@
 {% block content %}
 <style>
     .homepage-hero {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
         color: white;
         padding: 100px 0;
         text-align: center;
@@ -75,23 +75,25 @@
 
     .cta-btn-primary {
         background: white;
-        color: #667eea;
+        color: #1e40af;
     }
 
     .cta-btn-primary:hover {
         transform: translateY(-2px);
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        background: #f1f5f9;
     }
 
     .cta-btn-secondary {
-        background: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.15);
         color: white;
         border: 2px solid white;
     }
 
     .cta-btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.25);
         transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
     }
 
     .features-section {
@@ -103,7 +105,7 @@
         font-weight: 700;
         text-align: center;
         margin-bottom: 50px;
-        color: #333;
+        color: #0f172a;
     }
 
     .features-grid {
@@ -117,36 +119,39 @@
         background: white;
         padding: 40px;
         border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
         text-align: center;
         transition: all 0.3s ease;
+        border: 1px solid #e2e8f0;
     }
 
     .feature-card:hover {
-        transform: translateY(-10px);
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        transform: translateY(-8px);
+        box-shadow: 0 12px 24px rgba(30, 64, 175, 0.12);
+        border-color: #1e40af;
     }
 
     .feature-icon {
         font-size: 3rem;
         margin-bottom: 20px;
+        color: #1e40af;
     }
 
     .feature-title {
         font-size: 1.5rem;
         font-weight: 600;
         margin-bottom: 15px;
-        color: #333;
+        color: #0f172a;
     }
 
     .feature-description {
-        color: #666;
+        color: #475569;
         line-height: 1.6;
         font-size: 0.95rem;
     }
 
     .stats-section {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
         color: white;
         padding: 80px 0;
         margin: 60px 0;
@@ -171,24 +176,24 @@
     }
 
     .dev-info {
-        background: #f8f9fa;
+        background: #f8fafc;
         padding: 40px;
         border-radius: 15px;
         margin: 60px 0;
         text-align: center;
-        border: 2px solid #e9ecef;
+        border: 2px solid #e2e8f0;
     }
 
     .dev-header {
         font-size: 1.3rem;
         font-weight: 600;
-        color: #333;
+        color: #0f172a;
         margin-bottom: 20px;
     }
 
     .version-badge {
         display: inline-block;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
         color: white;
         padding: 8px 20px;
         border-radius: 50px;
@@ -198,8 +203,8 @@
     }
 
     .stage-badge {
-        background: #ffc107;
-        color: #333;
+        background: #b45309;
+        color: white;
     }
 
     .dev-links {
@@ -214,19 +219,19 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        color: #667eea;
+        color: #1e40af;
         text-decoration: none;
         font-weight: 600;
         transition: all 0.3s ease;
     }
 
     .dev-link:hover {
-        color: #764ba2;
+        color: #1e3a8a;
         transform: translateX(3px);
     }
 
     .footer-section {
-        background: #333;
+        background: #0f172a;
         color: white;
         padding: 50px 0;
         text-align: center;
@@ -253,7 +258,7 @@
     }
 
     .footer-links a:hover {
-        color: #667eea;
+        color: #3b82f6;
     }
 
     @media (max-width: 768px) {

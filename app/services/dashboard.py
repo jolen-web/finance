@@ -74,7 +74,7 @@ class DashboardService:
     def get_net_worth_data(self):
         accounts = Account.query.filter_by(user_id=self.user_id, is_active=True).all()
 
-        total_assets = sum(acc.current_balance for acc in accounts if acc.account_type in ['checking', 'savings', 'cash'])
+        total_assets = sum(acc.current_balance for acc in accounts if acc.account_type in ['checking', 'savings', 'cash', 'digital_wallet'])
         total_liabilities = sum(abs(acc.current_balance) for acc in accounts if acc.account_type == 'credit_card')
         net_worth = total_assets - total_liabilities
 

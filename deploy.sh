@@ -21,7 +21,7 @@ echo ""
 
 # Step 1: Build Docker image
 echo "📦 Building Docker image..."
-docker build -t "${IMAGE_NAME}:latest" .
+docker build --platform=linux/amd64 -t "${IMAGE_NAME}:latest" .
 
 # Step 2: Push to Container Registry
 echo "📤 Pushing image to Google Container Registry..."

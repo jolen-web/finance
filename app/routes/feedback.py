@@ -11,6 +11,9 @@ feedback_bp = Blueprint('feedback', __name__, url_prefix='/feedback')
 def new_feedback():
     """Create new feedback"""
     if request.method == 'POST':
+        # Check if this is an AJAX request (JSON or FormData with XMLHttpRequest header)
+        is_ajax = request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
         if request.is_json:
             data = request.get_json()
             feedback = Feedback(
@@ -30,7 +33,7 @@ def new_feedback():
             )
 
         if not feedback.title or not feedback.description:
-            if request.is_json:
+            if is_ajax:
                 return jsonify({'message': 'Title and description are required', 'errors': {}}), 400
             flash('Title and description are required', 'error')
             return redirect(url_for('feedback.new_feedback'))
@@ -38,7 +41,7 @@ def new_feedback():
         db.session.add(feedback)
         db.session.commit()
 
-        if request.is_json:
+        if is_ajax:
             return jsonify({
                 'message': 'Thank you for your feedback!',
                 'redirect': url_for('feedback.list_feedback')

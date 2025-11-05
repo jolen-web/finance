@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.models import Account, Transaction
 from app import db, limiter
+from decimal import Decimal, InvalidOperation
 
 bp = Blueprint('accounts', __name__, url_prefix='/accounts')
 
@@ -16,7 +17,7 @@ def list_accounts():
     for account in accounts:
         if account.account_type == 'credit_card':
             total_liabilities += account.current_balance
-        else:
+        elif account.account_type in ['checking', 'savings', 'cash', 'digital_wallet']:
             total_assets += account.current_balance
             
     net_worth = total_assets - total_liabilities
@@ -36,8 +37,8 @@ def new_account():
         name = request.form.get('name')
         account_type = request.form.get('account_type')
         try:
-            starting_balance = float(request.form.get('starting_balance', 0))
-        except ValueError:
+            starting_balance = Decimal(request.form.get('starting_balance', '0'))
+        except InvalidOperation:
             flash('Starting balance must be a valid number.', 'danger')
             return redirect(url_for('accounts.new_account'))
 
@@ -73,8 +74,8 @@ def edit_account(id):
 
     if request.method == 'POST':
         try:
-            starting_balance = float(request.form.get('starting_balance', 0))
-        except (ValueError, TypeError):
+            starting_balance = Decimal(request.form.get('starting_balance', '0'))
+        except (ValueError, TypeError, InvalidOperation):
             flash('Starting balance must be a valid number.', 'danger')
             return redirect(url_for('accounts.edit_account', id=id))
 

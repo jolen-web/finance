@@ -3,6 +3,7 @@ from flask_login import current_user, login_required
 from app.models import Transaction, Account, Category, RegexPattern
 from app import db, limiter
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 def learn_regex_from_payee(payee, user_id, account_type):
     import re
@@ -10,19 +11,24 @@ def learn_regex_from_payee(payee, user_id, account_type):
     if not payee:
         return
 
-    # Simple regex: escape special characters and allow for some variations
-    pattern = re.escape(payee)
-    
-    # Check if a similar pattern already exists
-    existing_pattern = RegexPattern.query.filter_by(user_id=user_id, pattern=pattern).first()
-    if not existing_pattern:
-        new_pattern = RegexPattern(
-            user_id=user_id,
-            pattern=pattern,
-            account_type=account_type,
-            confidence_score=0.6  # Start with a medium confidence
-        )
-        db.session.add(new_pattern)
+    try:
+        # Simple regex: escape special characters and allow for some variations
+        pattern = re.escape(payee)
+
+        # Check if a similar pattern already exists
+        existing_pattern = RegexPattern.query.filter_by(user_id=user_id, pattern=pattern).first()
+        if not existing_pattern:
+            new_pattern = RegexPattern(
+                user_id=user_id,
+                pattern=pattern,
+                account_type=account_type,
+                confidence_score=0.6  # Start with a medium confidence
+            )
+            db.session.add(new_pattern)
+    except Exception as e:
+        # Log error but don't fail the transaction
+        import logging
+        logging.warning(f"Error learning regex pattern from payee '{payee}': {str(e)}")
 
 bp = Blueprint('transactions', __name__, url_prefix='/transactions')
 
@@ -75,10 +81,10 @@ def new_transaction():
         category_id = request.form.get('category_id')
 
         try:
-            amount = float(request.form.get('amount'))
+            amount = Decimal(request.form.get('amount'))
             account_id = int(request.form.get('account_id'))
             category_id = int(category_id) if category_id else None
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, InvalidOperation):
             flash('Invalid amount or account selection', 'danger')
             return render_template('transactions/form.html', transaction=None)
 
@@ -133,10 +139,10 @@ def edit_transaction(id):
         try:
             date_str = request.form.get('date')
             transaction.date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            transaction.amount = float(request.form.get('amount'))
+            transaction.amount = Decimal(request.form.get('amount'))
             transaction.account_id = int(request.form.get('account_id'))
             category_id = request.form.get('category_id')
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, InvalidOperation):
             flash('Invalid amount or account selection', 'danger')
             return redirect(url_for('transactions.edit_transaction', id=id))
 
@@ -276,8 +282,8 @@ def quick_add_transaction():
         # Parse and validate data
         try:
             transaction_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            amount_float = float(amount)
-        except ValueError:
+            amount_decimal = Decimal(amount)
+        except (ValueError, InvalidOperation):
             return jsonify({'error': 'Invalid date or amount format'}), 400
 
         # Verify account exists and belongs to user
@@ -296,7 +302,7 @@ def quick_add_transaction():
         transaction = Transaction(
             user_id=current_user.id,
             date=transaction_date,
-            amount=amount_float,
+            amount=amount_decimal,
             payee=payee,
             memo=memo,
             transaction_type=transaction_type,

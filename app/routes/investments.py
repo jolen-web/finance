@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from app.models import Investment, InvestmentCategory, Account
 from app import db
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 bp = Blueprint('investments', __name__, url_prefix='/investments')
 
@@ -44,11 +45,11 @@ def new_investment():
         category_id = request.form.get('category_id') or None
 
         try:
-            quantity = float(request.form.get('quantity', 0))
-            purchase_price = float(request.form.get('purchase_price', 0))
-            current_price = request.form.get('current_price')
-            current_price = float(current_price) if current_price else None
-        except (ValueError, TypeError):
+            quantity = Decimal(request.form.get('quantity', '0'))
+            purchase_price = Decimal(request.form.get('purchase_price', '0'))
+            current_price_str = request.form.get('current_price')
+            current_price = Decimal(current_price_str) if current_price_str else None
+        except (ValueError, TypeError, InvalidOperation):
             flash('Invalid quantity, price, or current price values.', 'danger')
             return redirect(url_for('investments.new_investment'))
         purchase_date_str = request.form.get('purchase_date')
@@ -99,11 +100,11 @@ def edit_investment(id):
 
     if request.method == 'POST':
         try:
-            quantity = float(request.form.get('quantity', 0))
-            purchase_price = float(request.form.get('purchase_price', 0))
-            current_price = request.form.get('current_price')
-            current_price = float(current_price) if current_price else None
-        except (ValueError, TypeError):
+            quantity = Decimal(request.form.get('quantity', '0'))
+            purchase_price = Decimal(request.form.get('purchase_price', '0'))
+            current_price_str = request.form.get('current_price')
+            current_price = Decimal(current_price_str) if current_price_str else None
+        except (ValueError, TypeError, InvalidOperation):
             flash('Invalid quantity, price, or current price values.', 'danger')
             return redirect(url_for('investments.edit_investment', id=id))
 

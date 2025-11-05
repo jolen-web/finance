@@ -16,6 +16,11 @@ from app import db
 import json
 import base64
 from dotenv import load_dotenv
+import logging
+from decimal import Decimal, InvalidOperation
+
+# Setup module logger
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -46,6 +51,8 @@ class ReceiptOCRAgent:
         self.upload_folder.mkdir(parents=True, exist_ok=True)
         self.allowed_extensions = {'png', 'jpg', 'jpeg', 'pdf', 'webp'}
         self.max_file_size = 10 * 1024 * 1024  # 10MB
+        # Performance: Cache compiled regex patterns
+        self._compiled_patterns_cache = {}
 
     def allowed_file(self, filename):
         """Check if file extension is allowed"""
@@ -98,9 +105,32 @@ class ReceiptOCRAgent:
             return False, None
 
     def save_receipt_file(self, file, transaction_id):
-        """Save uploaded receipt file with content validation"""
-        if not file or not self.allowed_file(file.filename):
-            return None, "Invalid file type"
+        """Save uploaded receipt file with content validation
+
+        Returns:
+            tuple: (filepath, filename) on success or (None, error_dict) on failure
+        """
+        if not file:
+            error = create_file_format_error('(no file)')
+            logger.warning(f"Save receipt file: {error.message}")
+            return None, error.to_dict()
+
+        if not self.allowed_file(file.filename):
+            error = create_file_format_error(file.filename)
+            logger.warning(f"Save receipt file: {error.message}")
+            return None, error.to_dict()
+
+        # Check file size before saving (10MB max)
+        file.seek(0, 2)  # Seek to end
+        file_size = file.tell()
+        file.seek(0)  # Seek back to start
+        max_size_bytes = self.max_file_size
+
+        if file_size > max_size_bytes:
+            size_mb = round(file_size / (1024 * 1024), 2)
+            error = create_file_size_error(size_mb)
+            logger.warning(f"Save receipt file: {error.message}")
+            return None, error.to_dict()
 
         # Create transaction-specific subdirectory
         trans_dir = self.upload_folder / str(transaction_id)
@@ -117,35 +147,52 @@ class ReceiptOCRAgent:
         # Save file temporarily
         try:
             file.save(str(filepath))
+            logger.info(f"File saved: {filepath}")
 
             # Validate file content (magic bytes check)
             is_valid, detected_type = self.validate_file_content(str(filepath))
             if not is_valid:
                 # Delete invalid file
                 os.remove(str(filepath))
-                return None, "Invalid file content. File does not match allowed types."
+                error = create_file_validation_error()
+                logger.warning(f"Save receipt file: {error.message}")
+                return None, error.to_dict()
 
+            logger.info(f"File validation passed: detected type={detected_type}")
             return str(filepath), filename
         except Exception as e:
             # Clean up on error
             if os.path.exists(str(filepath)):
                 os.remove(str(filepath))
-            return None, str(e)
+            logger.error(f"Save receipt file error: {str(e)}")
+            error_dict = {
+                'error_type': 'FILE_SAVE_ERROR',
+                'message': str(e),
+                'user_message': '⚠️ Error saving file. Please try again.',
+                'action': 'RETRY',
+                'error_code': 'FILE_SAVE_ERROR'
+            }
+            return None, error_dict
 
     def extract_text_from_image(self, image_path):
-        """Extract text from image using OCR with preprocessing"""
-        import logging
-        logger = logging.getLogger(__name__)
+        """Extract text from image using OCR with preprocessing
 
+        Returns:
+            tuple: (text, None) on success or (None, error_dict) on failure
+        """
         try:
             # Open image
             image = Image.open(image_path)
-            logger.info(f"Image opened: {image.size}, mode: {image.mode}")
+            logger.info(f"OCR: Image opened - size={image.size}, mode={image.mode}, path={image_path}")
+
+            # Get file size for logging
+            file_size = os.path.getsize(image_path)
+            logger.info(f"OCR: File size={file_size} bytes ({round(file_size/1024, 2)} KB)")
 
             # Convert to RGB if needed
             if image.mode != 'RGB':
                 image = image.convert('RGB')
-                logger.info(f"Converted image to RGB mode")
+                logger.debug(f"OCR: Converted image to RGB mode")
 
             # --- Advanced Preprocessing ---
             from PIL import ImageEnhance, ImageFilter
@@ -154,50 +201,75 @@ class ReceiptOCRAgent:
             width, height = image.size
             new_size = (width * 2, height * 2)
             image = image.resize(new_size, Image.LANCZOS)
-            logger.info(f"Resized image to {new_size}")
+            logger.debug(f"OCR: Resized image from {(width, height)} to {new_size}")
 
             # 2. Convert to grayscale
             gray_image = image.convert('L')
+            logger.debug(f"OCR: Converted to grayscale")
 
             # 3. Increase contrast
             enhancer = ImageEnhance.Contrast(gray_image)
             enhanced_image = enhancer.enhance(2.0)
+            logger.debug(f"OCR: Enhanced contrast (2.0x)")
 
             # 4. Binarization (convert to black and white)
             threshold = 128
             binary_image = enhanced_image.point(lambda x: 0 if x < threshold else 255, '1')
-            logger.info(f"Applied binarization with threshold {threshold}")
-
-            # 5. Noise removal (optional, can sometimes hurt)
-            # denoised_image = binary_image.filter(ImageFilter.MedianFilter(size=3))
+            logger.debug(f"OCR: Applied binarization (threshold={threshold})")
 
             # --- OCR Attempts ---
 
-            # Config 1: Default OCR on preprocessed image
+            # Config 1: Default OCR on preprocessed image (fast, usually works well)
+            logger.info(f"OCR: Starting Tesseract extraction with preprocessed image...")
             text = pytesseract.image_to_string(binary_image, config='--psm 6')
-            logger.info(f"OCR extracted {len(text)} characters (preprocessed config)")
+            logger.info(f"OCR: Preprocessed extraction returned {len(text)} characters")
 
-            # If we got very little text, try without preprocessing
-            if len(text.strip()) < 20:
-                logger.warning(f"Low text extraction ({len(text)} chars), trying with original image...")
-                original_image = Image.open(image_path)
-                text = pytesseract.image_to_string(original_image)
-                logger.info(f"OCR extracted {len(text)} characters (original image)")
+            # Early exit if we got enough text (performance optimization)
+            min_text_threshold = 50  # Minimum meaningful characters
+            if len(text.strip()) >= min_text_threshold:
+                logger.info(f"OCR: Sufficient text extracted ({len(text)} chars), skipping retry")
+            else:
+                # If we got very little text, try without preprocessing
+                if len(text.strip()) < 20:
+                    logger.warning(f"OCR: Low text extraction ({len(text)} chars), retrying with original image...")
+                    original_image = Image.open(image_path)
+                    text = pytesseract.image_to_string(original_image)
+                    logger.info(f"OCR: Original image extraction returned {len(text)} characters")
 
-            logger.info("="*80)
-            logger.info("EXTRACTED OCR TEXT:")
-            logger.info(text)
-            logger.info("="*80)
+            # Log extracted content (first 500 chars for debugging)
+            if text and len(text.strip()) > 0:
+                logger.info(f"OCR: Successfully extracted text ({len(text)} chars total)")
+                logger.debug(f"OCR: First 500 chars: {text[:500]}")
+            else:
+                logger.warning(f"OCR: No text extracted from image")
 
             return text, None
         except Exception as e:
-            logger.error(f"OCR error: {str(e)}")
-            return None, f"OCR error: {str(e)}"
+            logger.error(f"OCR: Extraction failed - {str(e)}", exc_info=True)
+            error_dict = {
+                'error_type': 'OCR_EXTRACTION_ERROR',
+                'message': f"OCR error: {str(e)}",
+                'user_message': '⚠️ Error extracting text from image. The image may be too blurry, too dark, or in an unsupported format.',
+                'action': 'IMPROVE_IMAGE',
+                'error_code': 'OCR_EXTRACTION_ERROR'
+            }
+            return None, error_dict
 
     def extract_text_from_pdf(self, pdf_path, password=None):
-        """Extract text from PDF with optional password support"""
+        """Extract text from PDF with optional password support
+
+        Returns:
+            tuple: (text, error_dict) where error_dict is None on success
+        """
         if not PDF_SUPPORT:
-            return None, "PDF support not available. Install pdfplumber and pypdf."
+            error_dict = {
+                'error_type': 'PDF_SUPPORT_ERROR',
+                'message': 'PDF support not available. Install pdfplumber and pypdf.',
+                'user_message': '⚠️ PDF support is not available on this system.',
+                'action': 'CONTACT_SUPPORT',
+                'error_code': 'PDF_SUPPORT_ERROR'
+            }
+            return None, error_dict
 
         try:
             # First check if PDF is encrypted
@@ -206,22 +278,36 @@ class ReceiptOCRAgent:
 
                 if reader.is_encrypted:
                     if not password:
-                        return None, "PDF_PASSWORD_REQUIRED"
+                        logger.info(f"PDF is encrypted, password required: {pdf_path}")
+                        error = create_pdf_password_error()
+                        return None, error.to_dict()
 
                     # Try to decrypt with password
                     try:
                         if not reader.decrypt(password):
-                            return None, "Invalid password"
+                            logger.warning(f"PDF decryption failed with provided password: {pdf_path}")
+                            error = create_invalid_password_error()
+                            return None, error.to_dict()
                     except Exception as e:
-                        return None, f"Password error: {str(e)}"
+                        logger.error(f"PDF password error: {str(e)}")
+                        error_dict = {
+                            'error_type': 'PDF_PASSWORD_ERROR',
+                            'message': f"Password error: {str(e)}",
+                            'user_message': '❌ Error processing PDF password. Please try again.',
+                            'action': 'RETRY_PASSWORD',
+                            'error_code': 'PDF_PASSWORD_ERROR'
+                        }
+                        return None, error_dict
 
             # Extract text using pdfplumber (better for tables/statements)
             text_content = []
             with pdfplumber.open(pdf_path, password=password) as pdf:
-                for page in pdf.pages:
+                logger.info(f"Extracting text from {len(pdf.pages)} PDF pages")
+                for page_num, page in enumerate(pdf.pages, 1):
                     page_text = page.extract_text()
                     if page_text:
                         text_content.append(page_text)
+                        logger.debug(f"Extracted {len(page_text)} chars from page {page_num}")
 
                     # Also try to extract tables (for credit card statements)
                     tables = page.extract_tables()
@@ -232,10 +318,19 @@ class ReceiptOCRAgent:
                                 text_content.append(' | '.join([str(cell) if cell else '' for cell in row]))
 
             full_text = '\n'.join(text_content)
+            logger.info(f"Total extracted text: {len(full_text)} chars from PDF")
             return full_text, None
 
         except Exception as e:
-            return None, f"PDF extraction error: {str(e)}"
+            logger.error(f"PDF extraction error: {str(e)}")
+            error_dict = {
+                'error_type': 'PDF_EXTRACTION_ERROR',
+                'message': f"PDF extraction error: {str(e)}",
+                'user_message': '⚠️ Error extracting text from PDF. File may be corrupted or in an unsupported format.',
+                'action': 'SELECT_DIFFERENT_FILE',
+                'error_code': 'PDF_EXTRACTION_ERROR'
+            }
+            return None, error_dict
 
     def extract_with_gemini_text(self, ocr_text, api_key=None):
         """Use Gemini to parse OCR text into structured transaction data
@@ -289,6 +384,8 @@ CRITICAL RULES:
             # Call Gemini API with text-only (no image)
             # Use the base model name for text generation
             model = genai_local.GenerativeModel('gemini-2.0-flash')
+            # Note: Gemini API doesn't support timeout parameter
+            # Calls may take time but will eventually complete or fail
             response = model.generate_content(prompt)
 
             # Parse response
@@ -322,17 +419,30 @@ CRITICAL RULES:
                 return None, f"Failed to parse Gemini response: {response_text[:100]}"
 
         except Exception as e:
+            # CRITICAL: Catch all exceptions to prevent worker crashes
             error_str = str(e)
+            error_type = type(e).__name__
+
+            logger.error(f"Gemini Text Exception ({error_type}): {error_str}", exc_info=True)
+
             # Check for API key invalid/expired error (400)
-            if '400' in error_str or 'API_KEY_INVALID' in error_str or 'API key' in error_str.lower():
+            if '400' in error_str or 'API_KEY_INVALID' in error_str or 'Invalid API' in error_str or 'API key' in error_str.lower():
                 logger.warning(f"Gemini API key invalid/expired (400): {error_str}")
                 return None, "API_KEY_INVALID"
+
             # Check for rate limit error (429)
-            if '429' in error_str or 'Resource exhausted' in error_str:
+            if '429' in error_str or 'Resource exhausted' in error_str or 'quota' in error_str.lower():
                 logger.warning(f"Gemini API rate limit reached (429): {error_str}")
                 return None, "RATE_LIMIT_429"
-            logger.error(f"Gemini text parsing error: {error_str}")
-            return None, f"Gemini text parsing error: {error_str}"
+
+            # Check for authentication errors
+            if 'auth' in error_str.lower() or 'unauthorized' in error_str.lower() or '401' in error_str:
+                logger.warning(f"Gemini API authentication error: {error_str}")
+                return None, "API_KEY_INVALID"
+
+            # All other exceptions are logged but handled gracefully
+            logger.error(f"Gemini Text extraction failed ({error_type}): {error_str[:100]}")
+            return None, f"Gemini text parsing error: {error_str[:100]}"
 
     def extract_with_gemini(self, image_path):
         """Extract receipt data using Gemini Vision API for intelligent analysis"""
@@ -386,6 +496,8 @@ CRITICAL RULES:
                 'data': image_data
             }
 
+            # Note: Gemini API doesn't support timeout parameter
+            # Calls may take time but will eventually complete or fail
             response = model.generate_content([prompt, image_content])
 
             # Parse response
@@ -417,18 +529,30 @@ CRITICAL RULES:
                 return None, f"Failed to parse Gemini response: {response_text[:100]}"
 
         except Exception as e:
+            # CRITICAL: Catch all exceptions to prevent worker crashes
             error_str = str(e)
+            error_type = type(e).__name__
+
+            logger.error(f"Gemini Vision Exception ({error_type}): {error_str}", exc_info=True)
+
             # Check for API key invalid/expired error (400)
-            if '400' in error_str or 'API_KEY_INVALID' in error_str or 'API key' in error_str.lower():
-                import logging
-                logging.warning(f"Gemini API key invalid/expired (400): {error_str}")
+            if '400' in error_str or 'API_KEY_INVALID' in error_str or 'Invalid API' in error_str or 'API key' in error_str.lower():
+                logger.warning(f"Gemini API key invalid/expired (400): {error_str}")
                 return None, "API_KEY_INVALID"
+
             # Check for rate limit error (429)
-            if '429' in error_str or 'Resource exhausted' in error_str:
-                import logging
-                logging.warning(f"Gemini API rate limit reached (429): {error_str}")
+            if '429' in error_str or 'Resource exhausted' in error_str or 'quota' in error_str.lower():
+                logger.warning(f"Gemini API rate limit reached (429): {error_str}")
                 return None, "RATE_LIMIT_429"
-            return None, f"Gemini extraction error: {error_str}"
+
+            # Check for authentication errors
+            if 'auth' in error_str.lower() or 'unauthorized' in error_str.lower() or '401' in error_str:
+                logger.warning(f"Gemini API authentication error: {error_str}")
+                return None, "API_KEY_INVALID"
+
+            # All other exceptions are logged but handled gracefully
+            logger.error(f"Gemini Vision extraction failed ({error_type}): {error_str[:100]}")
+            return None, f"Gemini extraction error: {error_str[:100]}"
 
     def _parse_column_format(self, ocr_text, logger):
         """Parse OCR text when dates, descriptions, and amounts are in separate columns/lines
@@ -491,7 +615,10 @@ CRITICAL RULES:
 
             # Parse amount
             amount_str = amounts[i].replace(',', '')
-            amount = -float(amount_str)  # Negative for expenses
+            try:
+                amount = -Decimal(amount_str)  # Negative for expenses
+            except InvalidOperation:
+                continue
 
             # Get description
             description = descriptions[i].strip()
@@ -515,12 +642,10 @@ CRITICAL RULES:
         - Multiple date formats
         - Transaction totals and balances
         """
-        import logging
-        logger = logging.getLogger(__name__)
-
         logger.info("="*80)
-        logger.info("RAW OCR TEXT:")
-        logger.info(ocr_text)
+        logger.info("PARSE_STATEMENT_DATA: Starting statement parsing")
+        logger.info(f"PARSE_STATEMENT_DATA: Input text length={len(ocr_text)} chars")
+        logger.debug(f"PARSE_STATEMENT_DATA: Raw text:\n{ocr_text[:1000]}")
         logger.info("="*80)
 
         transactions = []
@@ -531,54 +656,103 @@ CRITICAL RULES:
         statement_total = None
         statement_info = {'total': None, 'previous_balance': None, 'new_balance': None}
 
-        # Get learned patterns from the database
+        # Get active learned patterns from the database, sorted by effectiveness score
         from app.models import RegexPattern
+        user_patterns = {}  # Store pattern ID -> pattern object for tracking
         try:
-            learned_patterns = RegexPattern.query.filter_by(user_id=user_id).order_by(RegexPattern.confidence_score.desc()).all()
+            # Load only active patterns, sorted by effectiveness (descending), then by confidence score
+            learned_patterns = RegexPattern.query.filter_by(
+                user_id=user_id,
+                is_active=True
+            ).order_by(
+                RegexPattern.effectiveness_score.desc(),
+                RegexPattern.confidence_score.desc()
+            ).all()
+
+            # Store patterns for later tracking
+            for p in learned_patterns:
+                user_patterns[p.pattern] = p
+
         except Exception as e:
             import logging
             logging.warning(f"Error loading regex patterns for user {user_id}: {str(e)}")
             learned_patterns = []
-        
-        # Common patterns for credit card statements
+
+        # Common patterns for credit card statements (built-in defaults)
+        # Ordered by expected frequency and accuracy
         patterns = [
             # Pattern 1: Two dates followed by description and amount (e.g., "09/21/25  09/22/25  MERCHANT NAME  859.52")
+            # Confidence: HIGH - Credit card statements often use posting date and description
             r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s+(.+?)\s+([\d,]+\.\d{2})\s*$',
+
             # Pattern 2: Two dates with description and amount - more flexible spacing
+            # Confidence: HIGH
             r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s+(.+?)\s{2,}([\d,]+\.\d{2})',
+
             # Pattern 3: MM/DD/YY Description Amount (standard format)
+            # Confidence: VERY HIGH - Most common receipt format
             r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+(.+?)\s+([\d,]+\.\d{2})$',
-            # Pattern 4: MM/DD Description | Amount
+
+            # Pattern 4: MM/DD Description | Amount (pipe separated)
+            # Confidence: MEDIUM-HIGH - Common in structured exports
             r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+(.+?)\s*\|\s*([\d,]+\.\d{2})',
-            # Pattern 5: Date in YYYY-MM-DD format
+
+            # Pattern 5: Date in YYYY-MM-DD format (ISO format)
+            # Confidence: HIGH
             r'(\d{4}[/-]\d{1,2}[/-]\d{1,2})\s+(.+?)\s+([\d,]+\.\d{2})$',
+
             # Pattern 6: Table format with multiple separators
+            # Confidence: MEDIUM-HIGH - Common in exported statements
             r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s*\|\s*(.+?)\s*\|\s*([\d,]+\.\d{2})',
+
             # Pattern 7: Very flexible - any date, text, and amount at end
+            # Confidence: MEDIUM - May capture false positives
             r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+(.+?)\s{2,}([\d,]+\.\d{2})\s*$',
+
             # Pattern 8: Month name format (e.g., "October 25, 2025 MERCHANT NAME 1415.50")
+            # Confidence: MEDIUM - Month format may vary
             r'([A-Za-z]+\s+\d{1,2},?\s+\d{4})\s+(.+?)\s+([\d,]+\.\d{2})\s*$',
+
             # Pattern 9: Month name with more flexible spacing
+            # Confidence: MEDIUM
             r'([A-Za-z]+\s+\d{1,2},?\s+\d{4})\s+(.+?)\s{2,}([\d,]+\.\d{2})',
         ]
 
+        # Prepend user's learned patterns (highest effectiveness first)
         for p in learned_patterns:
+            # Validate that pattern has exactly 3 capture groups
+            try:
+                test_compile = re.compile(p.pattern)
+                if test_compile.groups != 3:
+                    logger.warning(f"PATTERN: Skipping user pattern with {test_compile.groups} groups (expected 3): {p.pattern[:50]}")
+                    continue
+            except re.error as e:
+                logger.warning(f"PATTERN: Skipping invalid user pattern: {e}")
+                continue
+
             patterns.insert(0, p.pattern)
+            logger.debug(f"PATTERN: Loaded user pattern (score={p.effectiveness_score:.2f}): {p.pattern[:50]}")
+
+        logger.info(f"PARSE_STATEMENT_DATA: Using {len(patterns)} patterns ({len(learned_patterns)} user patterns)")
 
         line_num = 0
+        matched_count = 0
         for line in lines:
             line_num += 1
             line_upper = line.upper()
 
             # Log each line for debugging
             if line.strip():
-                logger.debug(f"Line {line_num}: {line.strip()}")
+                logger.debug(f"Line {line_num}: {line.strip()[:100]}")
 
             # Extract statement totals/balances
             if 'TOTAL' in line_upper or 'BALANCE' in line_upper:
                 amount_match = re.search(r'([\d,]+\.\d{2})', line)
                 if amount_match:
-                    amount = float(amount_match.group(1).replace(',', ''))
+                    try:
+                        amount = Decimal(amount_match.group(1).replace(',', ''))
+                    except InvalidOperation:
+                        amount = Decimal('0')
                     if 'PREVIOUS' in line_upper:
                         statement_info['previous_balance'] = amount
                     elif 'NEW' in line_upper or 'CURRENT' in line_upper:
@@ -595,34 +769,63 @@ CRITICAL RULES:
             if any(header in line_upper for header in ['TRANSACTION', 'DATE', 'DESCRIPTION', 'AMOUNT', 'REFERENCE', 'POST']):
                 continue
 
-            # Try each pattern
+            # Try each pattern (compile and cache for performance)
             matched = False
             for idx, pattern in enumerate(patterns):
-                match = re.search(pattern, line.strip())
-                if match:
-                    logger.info(f"✓ Line {line_num} matched pattern {idx+1}: {line.strip()}")
-                    matched = True
-                    date_str, description, amount_str = match.groups()
+                # Use cached compiled pattern if available
+                if pattern not in self._compiled_patterns_cache:
+                    try:
+                        self._compiled_patterns_cache[pattern] = re.compile(pattern)
+                    except re.error as e:
+                        logger.warning(f"Invalid regex pattern at index {idx}: {str(e)}")
+                        continue
 
-                    # Parse date
+                compiled_pattern = self._compiled_patterns_cache[pattern]
+                match = compiled_pattern.search(line.strip())
+                if match:
+                    pattern_type = "user" if idx < len(learned_patterns) else "builtin"
+                    logger.info(f"MATCH: Line {line_num} matched pattern {idx+1} ({pattern_type}): {line.strip()[:80]}")
+
+                    # Validate we have exactly 3 groups
+                    groups = match.groups()
+                    if len(groups) != 3:
+                        logger.warning(f"Pattern returned {len(groups)} groups instead of 3, skipping: {line.strip()[:80]}")
+                        continue
+
+                    matched = True
+                    matched_count += 1
+                    date_str, description, amount_str = groups
+
+                    # Parse date with improved logic
                     parsed_date = None
                     date_formats = [
-                        '%m/%d/%y', '%m/%d/%Y', '%d/%m/%y', '%d/%m/%Y',
-                        '%m-%d-%y', '%m-%d-%Y', '%d-%m-%Y', '%Y-%m-%d',
-                        '%Y/%m/%d', '%d-%b-%Y', '%d-%b-%y', '%B %d, %Y', '%b %d, %Y'
+                        ('%m/%d/%y', 'US short'),
+                        ('%m/%d/%Y', 'US long'),
+                        ('%d/%m/%y', 'EU short'),
+                        ('%d/%m/%Y', 'EU long'),
+                        ('%m-%d-%y', 'US dash short'),
+                        ('%m-%d-%Y', 'US dash long'),
+                        ('%d-%m-%Y', 'EU dash'),
+                        ('%Y-%m-%d', 'ISO format'),
+                        ('%Y/%m/%d', 'ISO slash'),
+                        ('%d-%b-%Y', 'Named EU'),
+                        ('%d-%b-%y', 'Named EU short'),
+                        ('%B %d, %Y', 'Full US'),
+                        ('%b %d, %Y', 'Abbrev US')
                     ]
 
-                    for fmt in date_formats:
+                    for fmt, fmt_name in date_formats:
                         try:
                             parsed_date = datetime.strptime(date_str, fmt).date()
+                            logger.debug(f"Date parsed ({fmt_name}): {date_str} -> {parsed_date}")
                             break
-                        except:
+                        except ValueError:
                             continue
 
                     # Parse amount (handle negative amounts and credits)
                     try:
                         amount_clean = amount_str.replace(',', '').strip()
-                        amount = float(amount_clean)
+                        amount = Decimal(amount_clean)
 
                         # Check for credit/payment indicators (these should be positive)
                         is_credit = 'CR' in line_upper or 'CREDIT' in line_upper or 'PAYMENT' in description.upper()
@@ -639,7 +842,14 @@ CRITICAL RULES:
                             if amount > 0:
                                 amount = -amount
 
-                    except:
+                    except InvalidOperation:
+                        # Failed to parse amount - record pattern failure
+                        if pattern in user_patterns:
+                            try:
+                                user_patterns[pattern].record_failure()
+                                db.session.commit()
+                            except Exception as e:
+                                logger.debug(f"Could not record pattern failure: {str(e)}")
                         continue
 
                     # Clean description
@@ -661,6 +871,14 @@ CRITICAL RULES:
                     description_clean = description_clean.strip()
 
                     if parsed_date and description_clean:
+                        # Record successful pattern usage
+                        if pattern in user_patterns:
+                            try:
+                                user_patterns[pattern].record_success()
+                                db.session.commit()
+                            except Exception as e:
+                                logger.debug(f"Could not record pattern success: {str(e)}")
+
                         transactions.append({
                             'date': parsed_date,
                             'description': description_clean,
@@ -685,7 +903,7 @@ CRITICAL RULES:
 
         # If still no transactions, try single receipt extraction (date, merchant, amount on separate lines)
         if len(transactions) == 0:
-            logger.warning("No transactions found, trying single receipt extraction...")
+            logger.warning("No transactions found, attempting single receipt extraction...")
 
             # Look for a date somewhere in the text
             receipt_date = None
@@ -701,22 +919,26 @@ CRITICAL RULES:
                     date_str = match.group(1)
                     try:
                         receipt_date = datetime.strptime(date_str, fmt).date()
-                        logger.info(f"✓ Found receipt date: {receipt_date}")
+                        logger.info(f"Single receipt: Found date: {receipt_date}")
                         break
-                    except:
+                    except ValueError:
                         continue
 
-            # Look for a total amount
+            # Look for a total amount (compile pattern once for performance)
             total_amount = None
-            amount_match = re.search(r'(?:TOTAL|AMOUNT|Grand\s*Total|Total\s*Due)[\s:$]*(\d+(?:[.,]\d{3})*[.,]\d{2})', ocr_text, re.IGNORECASE)
+            total_pattern = re.compile(r'(?:TOTAL|AMOUNT|Grand\s*Total|Total\s*Due)[\s:$]*(\d+(?:[.,]\d{3})*[.,]\d{2})', re.IGNORECASE)
+            amount_match = total_pattern.search(ocr_text)
             if amount_match:
-                total_amount = -float(amount_match.group(1).replace(',', ''))
-                logger.info(f"✓ Found total amount: {total_amount}")
+                try:
+                    total_amount = -float(amount_match.group(1).replace(',', ''))
+                    logger.info(f"Single receipt: Found amount: {total_amount}")
+                except (ValueError, IndexError):
+                    pass
 
             # Look for merchant name (usually near top or has specific keywords)
             merchant_name = None
             # Try to find merchant by looking for company-like names at the top
-            for line in lines[:15]:  # Check first 15 lines
+            for line in lines[:15]:  # Check first 15 lines only (performance)
                 line_stripped = line.strip()
                 # Skip lines that are too short, dates, amounts, or headers
                 if (len(line_stripped) > 10 and
@@ -727,7 +949,7 @@ CRITICAL RULES:
                     'TRANS' not in line_stripped.upper() and
                     'TOTAL' not in line_stripped.upper()):
                     merchant_name = line_stripped
-                    logger.info(f"✓ Found merchant: {merchant_name}")
+                    logger.info(f"Single receipt: Found merchant: {merchant_name}")
                     break
 
             # If we found all three pieces of info, create a transaction
@@ -737,7 +959,7 @@ CRITICAL RULES:
                     'description': merchant_name,
                     'amount': total_amount  # Keep as negative for charges (consistent with statement parsing)
                 })
-                logger.info(f"✓ Single receipt extraction: {receipt_date} | {merchant_name} | {total_amount}")
+                logger.info(f"Single receipt extraction successful: {receipt_date} | {merchant_name} | {total_amount}")
 
         # Calculate total from line items if not found in statement
         if not statement_info.get('total') and transactions:
@@ -748,7 +970,12 @@ CRITICAL RULES:
             transactions[0]['_statement_info'] = statement_info
 
         logger.info(f"="*80)
-        logger.info(f"TOTAL TRANSACTIONS EXTRACTED: {len(transactions)}")
+        logger.info(f"PARSE_STATEMENT_DATA: Complete")
+        logger.info(f"  Input lines: {len(lines)}")
+        logger.info(f"  Lines matched: {matched_count}")
+        logger.info(f"  Transactions extracted: {len(transactions)}")
+        logger.info(f"  User patterns used: {len(learned_patterns)}")
+        logger.info(f"  Extraction success rate: {(len(transactions)/max(len(lines), 1)*100):.1f}%")
         logger.info(f"="*80)
 
         return {'line_items': transactions}
@@ -815,9 +1042,9 @@ CRITICAL RULES:
             for match in matches:
                 amount_str = match.group(1).replace(',', '.')
                 try:
-                    amount = float(amount_str)
+                    amount = Decimal(amount_str)
                     amounts_found.append(amount)
-                except:
+                except InvalidOperation:
                     continue
 
         # Use the largest amount found (likely the total)
@@ -831,12 +1058,16 @@ CRITICAL RULES:
         for item in items:
             item_name = item.group(1).strip()
             quantity = item.group(2)
-            price = item.group(3).replace(',', '.')
+            price_str = item.group(3).replace(',', '.')
+            try:
+                price = Decimal(price_str)
+            except InvalidOperation:
+                price = Decimal('0')
 
             data['items'].append({
                 'name': item_name,
                 'quantity': int(quantity),
-                'price': float(price)
+                'price': price
             })
 
         return data
@@ -852,10 +1083,8 @@ CRITICAL RULES:
             user: Optional Flask-Login user object (for accessing user's API key)
 
         Returns:
-            tuple: (filepath, filename, parsed_data, file_type) or (None, None, error_message, None)
+            tuple: (filepath, filename, parsed_data, file_type) or (None, None, error_dict, None)
         """
-        import logging
-        logger = logging.getLogger(__name__)
         logger.info("--- Starting Receipt Extraction ---")
 
         # Get user's API key if available
@@ -869,7 +1098,7 @@ CRITICAL RULES:
         filepath, filename_or_error = self.save_receipt_file(file, temp_folder)
         if not filepath:
             logger.error(f"Failed to save file: {filename_or_error}")
-            return None, None, filename_or_error, None
+            return None, None, filename_or_error, None  # Return error dict
         logger.info(f"File saved to: {filepath}")
 
         file_type = file.content_type or 'image/jpeg'
@@ -897,6 +1126,7 @@ CRITICAL RULES:
         parsed_data = None
         rate_limit_hit = False
         api_key_invalid = False
+        gemini_error_msg = None
 
         if GEMINI_AVAILABLE:
             if not is_pdf:
@@ -912,11 +1142,14 @@ CRITICAL RULES:
                 elif gemini_error == "API_KEY_INVALID":
                     logger.warning("✗ Gemini Vision API key invalid/expired (400)")
                     api_key_invalid = True
+                    gemini_error_msg = "Gemini API key is invalid or expired"
                 elif gemini_error == "RATE_LIMIT_429":
                     logger.warning("✗ Gemini Vision rate limit hit (429)")
                     rate_limit_hit = True
+                    gemini_error_msg = "Gemini API rate limit reached"
                 else:
                     logger.warning(f"✗ Gemini Vision parsing failed: {gemini_error}")
+                    gemini_error_msg = gemini_error
 
             if not parsed_data and ocr_text:
                 logger.info("Attempting to parse with Gemini Text API (text input)...")
@@ -931,11 +1164,14 @@ CRITICAL RULES:
                 elif gemini_error == "API_KEY_INVALID":
                     logger.warning("✗ Gemini Text API key invalid/expired (400)")
                     api_key_invalid = True
+                    gemini_error_msg = "Gemini API key is invalid or expired"
                 elif gemini_error == "RATE_LIMIT_429":
                     logger.warning("✗ Gemini Text rate limit hit (429)")
                     rate_limit_hit = True
+                    gemini_error_msg = "Gemini API rate limit reached"
                 else:
                     logger.warning(f"✗ Gemini Text parsing failed: {gemini_error}")
+                    gemini_error_msg = gemini_error
         else:
             logger.info("Gemini is not available. Skipping to regex parsing.")
 
@@ -961,6 +1197,9 @@ CRITICAL RULES:
         if api_key_invalid:
             parsed_data['_api_key_invalid'] = True
             logger.warning("API key invalid flag set in parsed_data")
+        if gemini_error_msg:
+            parsed_data['_gemini_error'] = gemini_error_msg
+            logger.warning(f"Gemini error stored in parsed_data: {gemini_error_msg}")
 
         logger.info("--- Finished Receipt Extraction ---")
         return filepath, filename_or_error, parsed_data, file_type
@@ -1114,7 +1353,7 @@ CRITICAL RULES:
         """Create new transaction from receipt data"""
         transaction = Transaction(
             date=receipt_data.get('date') or datetime.now().date(),
-            amount=receipt_data.get('amount') or 0.0,
+            amount=receipt_data.get('amount') or Decimal('0.0'),
             payee=receipt_data.get('merchant') or 'Unknown Merchant',
             memo=f"Auto-created from receipt. Items: {len(receipt_data.get('items', []))}",
             transaction_type='withdrawal',
@@ -1233,10 +1472,121 @@ def get_active_gemini_api_key(user=None):
             if user_key:
                 return user_key
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Failed to decrypt user's API key: {str(e)}")
 
     # Fall back to system API key from environment
     system_key = os.getenv('GOOGLE_API_KEY')
     return system_key if system_key else None
+
+
+# ============================================================================
+# STRUCTURED ERROR HANDLING HELPERS
+# ============================================================================
+
+class ExtractionError:
+    """Structured error information with actionable guidance for users"""
+
+    def __init__(self, error_type, message, user_message=None, action=None, error_code=None):
+        self.error_type = error_type  # 'API_KEY', 'RATE_LIMIT', 'FILE_FORMAT', 'IMAGE_QUALITY', etc.
+        self.message = message  # Technical message for logs
+        self.user_message = user_message or message  # Friendly message for frontend
+        self.action = action  # Suggested action (e.g., 'RETRY', 'UPDATE_KEY', 'IMPROVE_IMAGE')
+        self.error_code = error_code  # Code for frontend error handling
+
+    def to_dict(self):
+        """Convert to JSON-serializable dict"""
+        return {
+            'error_type': self.error_type,
+            'message': self.message,
+            'user_message': self.user_message,
+            'action': self.action,
+            'error_code': self.error_code
+        }
+
+
+def create_api_key_error():
+    """Create structured error for API key issues"""
+    return ExtractionError(
+        error_type='API_KEY_INVALID',
+        message='Gemini API key invalid or expired',
+        user_message='🔑 Your API key has expired or is invalid. Please add a new one in Settings → API Configuration.',
+        action='UPDATE_KEY',
+        error_code='API_KEY_INVALID'
+    )
+
+
+def create_rate_limit_error():
+    """Create structured error for rate limit issues"""
+    return ExtractionError(
+        error_type='RATE_LIMIT',
+        message='Gemini API rate limit reached (429)',
+        user_message='⏳ API rate limit reached. Please try again in a few minutes.',
+        action='RETRY',
+        error_code='RATE_LIMIT_429'
+    )
+
+
+def create_file_format_error(filename):
+    """Create structured error for unsupported file formats"""
+    return ExtractionError(
+        error_type='FILE_FORMAT',
+        message=f'Unsupported file format: {filename}',
+        user_message='📄 File format not supported. Please upload PNG, JPG, JPEG, WEBP, or PDF files (max 10MB).',
+        action='SELECT_DIFFERENT_FILE',
+        error_code='FILE_FORMAT_INVALID'
+    )
+
+
+def create_file_size_error(size_mb, max_mb=10):
+    """Create structured error for oversized files"""
+    return ExtractionError(
+        error_type='FILE_TOO_LARGE',
+        message=f'File size {size_mb}MB exceeds maximum {max_mb}MB',
+        user_message=f'📦 File is too large ({size_mb}MB). Maximum size is {max_mb}MB. Please compress and try again.',
+        action='REDUCE_FILE_SIZE',
+        error_code='FILE_TOO_LARGE'
+    )
+
+
+def create_file_validation_error():
+    """Create structured error for file content validation"""
+    return ExtractionError(
+        error_type='FILE_VALIDATION',
+        message='File content does not match allowed types (magic bytes check failed)',
+        user_message='⚠️ File appears to be corrupted or not a valid image/PDF. Please ensure the file is not damaged.',
+        action='SELECT_DIFFERENT_FILE',
+        error_code='FILE_VALIDATION_FAILED'
+    )
+
+
+def create_extraction_failed_error(method):
+    """Create structured error for extraction failures"""
+    return ExtractionError(
+        error_type='EXTRACTION_FAILED',
+        message=f'{method} extraction failed or returned no data',
+        user_message='❌ Unable to extract data from the receipt. This might be due to poor image quality, glare, or unsupported format. Try uploading a clearer image.',
+        action='IMPROVE_IMAGE',
+        error_code='EXTRACTION_FAILED'
+    )
+
+
+def create_pdf_password_error():
+    """Create structured error for password-protected PDFs"""
+    return ExtractionError(
+        error_type='PDF_PASSWORD_REQUIRED',
+        message='PDF is password-protected',
+        user_message='🔐 This PDF is password-protected. Please enter the password.',
+        action='PROVIDE_PASSWORD',
+        error_code='PDF_PASSWORD_REQUIRED'
+    )
+
+
+def create_invalid_password_error():
+    """Create structured error for incorrect PDF password"""
+    return ExtractionError(
+        error_type='INVALID_PASSWORD',
+        message='Incorrect PDF password',
+        user_message='❌ Password is incorrect. Please try again.',
+        action='RETRY_PASSWORD',
+        error_code='INVALID_PASSWORD'
+    )

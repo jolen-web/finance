@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-basedir = Path(__file__).parent.absolute()
+basedir = Path(__file__).resolve().parent.parent
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY')
@@ -25,7 +25,7 @@ class Config:
     else:
         # Local development or explicit DATABASE_URL
         SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-            'sqlite:///' + os.path.join(str(basedir), '..', 'data', 'finance.db')
+            'sqlite:///' + os.path.join(str(basedir), 'data', 'finance.db')
 
     # Enable dynamic query tracking
     SQLALCHEMY_ENGINE_OPTIONS = {

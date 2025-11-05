@@ -76,7 +76,51 @@ cat alembic.ini | grep -E "sqlalchemy.url|script_location"
 - ✅ Migration framework is installed and configured
 - ✅ Migration files can be applied to production database
 
-### 3. Environment Variables & Secrets Audit
+### 3. Database Schema Synchronization
+
+**Checks**:
+- Local and Cloud SQL schemas are identical
+- All migrations have been applied to Cloud SQL
+- No pending migrations exist
+- Schema version history matches between databases
+- No column type mismatches
+- All foreign keys are consistent
+
+**Commands Used**:
+```bash
+# Validate schemas are identical (blocks deployment if mismatch)
+python schema_sync_agent.py --validate
+
+# Check for differences
+python schema_sync_agent.py --check
+
+# Generate detailed report
+python schema_sync_agent.py --report
+
+# Generate JSON status
+python schema_sync_agent.py --status
+```
+
+**What It Verifies**:
+- ✅ Local development schema matches Cloud SQL production schema
+- ✅ All migrations have been successfully applied
+- ✅ No schema drift between databases
+- ✅ Database changes are consistent across environments
+- ✅ Safe to deploy without schema issues
+
+**CRITICAL**: This check must pass before deployment. If schemas don't match:
+```bash
+# 1. Check locally what's different
+python schema_sync_agent.py --check
+
+# 2. Apply pending migrations to Cloud SQL
+python schema_sync_agent.py --sync --apply
+
+# 3. Verify success
+python schema_sync_agent.py --validate
+```
+
+### 4. Environment Variables & Secrets Audit
 
 **Checks**:
 - All required environment variables are defined
@@ -101,7 +145,7 @@ grep -r "SECRET\|PASSWORD\|API_KEY" app/ --include="*.py" | head -20
 - ✅ Production has all required environment variables
 - ✅ No sensitive data leaked in source code
 
-### 4. Docker Image Verification
+### 5. Docker Image Verification
 
 **Checks**:
 - Docker image exists in Google Container Registry
@@ -124,7 +168,7 @@ grep -E "gunicorn|CMD|EXPOSE" Dockerfile
 - ✅ Image is compatible with Cloud Run
 - ✅ Gunicorn is properly configured for production
 
-### 5. Infrastructure Readiness
+### 6. Infrastructure Readiness
 
 **Cloud Run Service Checks**:
 - Service `finance-tracker` exists
@@ -157,7 +201,7 @@ gcloud sql backups list --instance=finance-db --project=jinolen --limit=5
 - ✅ Service can connect to database
 - ✅ No infrastructure bottlenecks
 
-### 6. Security Configuration Check
+### 7. Security Configuration Check
 
 **Application Security**:
 - CSRF tokens implemented in forms
@@ -195,7 +239,7 @@ gcloud projects get-iam-policy jinolen \
 - ✅ Communications are encrypted
 - ✅ Access is properly controlled
 
-### 7. Pre-Deployment Code Validation
+### 8. Pre-Deployment Code Validation
 
 **Checks**:
 - Python syntax is valid (all files parse correctly)
@@ -218,7 +262,7 @@ grep -E "flask|sqlalchemy|psycopg2" requirements.txt
 - ✅ Dependencies are properly declared
 - ✅ Application can start without errors
 
-### 8. Post-Deployment Verification
+### 9. Post-Deployment Verification
 
 **Service Health**:
 - Cloud Run service is in "Ready" state

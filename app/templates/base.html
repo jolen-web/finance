@@ -87,11 +87,6 @@
                             <i class="fas fa-comment-dots"></i> Feedback
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <button id="theme-toggle-btn" class="nav-link" style="background: none; border: none; cursor: pointer; padding: 0.5rem 1rem; border-radius: 0.5rem; margin: 0 0.25rem;">
-                            <i class="fas fa-moon"></i>
-                        </button>
-                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false">
                             <i class="fas fa-user-circle"></i> {% if current_user.username %}{{ current_user.username }}{% else %}Profile{% endif %}

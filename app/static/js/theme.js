@@ -12,16 +12,11 @@ class ThemeManager {
   }
 
   init() {
-    // Get saved preference or detect system preference
+    // Get saved preference, default to light mode
     const saved = localStorage.getItem(this.STORAGE_KEY);
-    const preference = saved || this.SYSTEM_THEME;
+    const preference = saved || this.LIGHT_THEME;
 
-    if (preference === this.SYSTEM_THEME) {
-      this.applySystemTheme();
-      this.listenToSystemTheme();
-    } else {
-      this.setTheme(preference);
-    }
+    this.setTheme(preference);
 
     // Set up toggle button if it exists
     this.setupToggleButton();
@@ -79,13 +74,20 @@ class ThemeManager {
     const button = document.getElementById('theme-toggle-btn');
     if (button) {
       const icon = button.querySelector('i');
+      const label = document.getElementById('theme-label');
+      const display = document.getElementById('current-theme-display');
+
       if (icon) {
         if (theme === this.DARK_THEME) {
           icon.className = 'fas fa-sun';
           button.title = 'Switch to Light Mode';
+          if (label) label.textContent = 'Switch to Light Mode';
+          if (display) display.textContent = 'Dark Mode';
         } else {
           icon.className = 'fas fa-moon';
           button.title = 'Switch to Dark Mode';
+          if (label) label.textContent = 'Switch to Dark Mode';
+          if (display) display.textContent = 'Light Mode';
         }
       }
     }

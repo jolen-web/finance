@@ -52,6 +52,7 @@
             </div>
             <div class="card-body">
                 <form method="POST" data-ajax>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="mb-4">
                         <label for="feedback_type" class="form-label">Feedback Type <span class="text-danger">*</span></label>
                         <select name="feedback_type" id="feedback_type" class="form-select" required>

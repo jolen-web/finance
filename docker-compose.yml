@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:13
@@ -30,11 +28,10 @@ services:
       - SECRET_KEY=a-very-secret-key-for-development
       - FLASK_APP=run.py
       - FLASK_ENV=development
+      - PORT=5001
     depends_on:
       db:
         condition: service_healthy
-    command: >
-      sh -c "flask db upgrade && gunicorn --workers 4 --bind 0.0.0.0:5001 wsgi:app"
     volumes:
       - .:/app
 
