@@ -19,7 +19,7 @@ class Config:
         DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
         DB_NAME = os.environ.get('DB_NAME', 'finance')
         SQLALCHEMY_DATABASE_URI = (
-            f'postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@/cloudsql/{CLOUD_SQL_CONNECTION_NAME}/{DB_NAME}'
+            f'postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@/{DB_NAME}?host=/cloudsql/{CLOUD_SQL_CONNECTION_NAME}'
         )
     else:
         # Local development or explicit DATABASE_URL
