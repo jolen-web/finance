@@ -3,7 +3,67 @@ from flask_login import login_required, current_user
 from app.models import Category, DashboardPreferences
 from app import db
 import json
+import re
+import signal
 from pathlib import Path
+from functools import wraps
+from contextlib import contextmanager
+
+class RegexTimeoutError(Exception):
+    """Raised when regex compilation/matching times out"""
+    pass
+
+def timeout_handler(signum, frame):
+    """Signal handler for regex timeout"""
+    raise RegexTimeoutError("Regex pattern validation timeout - pattern may be too complex")
+
+@contextmanager
+def regex_timeout(seconds=2):
+    """Context manager for regex operations with timeout"""
+    # Signal-based timeout only works on Unix/Linux
+    # For production, consider using regex library with timeout support
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+
+def validate_regex_pattern(pattern_str, max_length=500):
+    """
+    Safely validate a regex pattern for complexity and validity
+
+    Args:
+        pattern_str: The regex pattern to validate
+        max_length: Maximum allowed pattern length
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not pattern_str:
+        return False, "Pattern cannot be empty"
+
+    if len(pattern_str) > max_length:
+        return False, f"Pattern exceeds maximum length of {max_length} characters"
+
+    # Check for obviously problematic patterns (nested quantifiers, excessive alternation)
+    suspicious_patterns = [
+        r'\(\w+\*\)\*',  # (x*)*
+        r'\(\w+\+\)\+',  # (x+)+
+        r'\(\w+\*\)\+',  # (x*)+
+        r'\|.*\|.*\|.*\|.*\|',  # More than 4 alternations
+    ]
+
+    for suspicious in suspicious_patterns:
+        if re.search(suspicious, pattern_str):
+            return False, "Pattern contains potentially dangerous nested quantifiers"
+
+    # Try to compile with a simple attempt (no timeout for now as signal doesn't work reliably on all platforms)
+    try:
+        re.compile(pattern_str)
+        return True, None
+    except re.error as e:
+        return False, f"Invalid regex pattern: {str(e)}"
 
 bp = Blueprint('settings', __name__, url_prefix='/settings')
 
@@ -283,12 +343,10 @@ def regex_patterns():
                 flash('Regex pattern cannot be empty.', 'danger')
                 return redirect(url_for('settings.regex_patterns'))
 
-            # Validate regex pattern
-            import re
-            try:
-                re.compile(pattern_str)
-            except re.error as e:
-                flash(f'Invalid regex pattern: {str(e)}', 'danger')
+            # Validate regex pattern for safety and correctness
+            is_valid, error_msg = validate_regex_pattern(pattern_str)
+            if not is_valid:
+                flash(error_msg or 'Invalid regex pattern.', 'danger')
                 return redirect(url_for('settings.regex_patterns'))
 
             if pattern_id:  # Edit existing

@@ -1,6 +1,6 @@
 """Routes for Financial Health Advisor"""
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import current_user
+from flask_login import current_user, login_required
 from datetime import datetime, timedelta
 from app import db
 from app.models import FinancialInsight, Transaction, Account
@@ -16,6 +16,7 @@ from app.services.financial_advisor import (
 bp = Blueprint('financial_advisor', __name__, url_prefix='/financial-advisor')
 
 @bp.route('/')
+@login_required
 def index():
     """Financial advisor dashboard"""
     # Get date range from query params
@@ -33,6 +34,7 @@ def index():
     # Get existing insights from database (last 30 days, not dismissed)
     thirty_days_ago = datetime.now() - timedelta(days=30)
     saved_insights = FinancialInsight.query.filter(
+        FinancialInsight.user_id == current_user.id,
         FinancialInsight.created_at >= thirty_days_ago,
         FinancialInsight.is_dismissed == False
     ).order_by(FinancialInsight.created_at.desc()).all()
@@ -51,7 +53,7 @@ def index():
     info_count = len(insights_by_type['info'])
 
     # Get account summary
-    accounts = Account.query.all()
+    accounts = Account.query.filter_by(user_id=current_user.id).all()
     total_balance = sum(acc.current_balance for acc in accounts)
 
     return render_template('financial_advisor/index.html',
@@ -94,6 +96,7 @@ def dismiss_insight(insight_id):
     return redirect(url_for('financial_advisor.index'))
 
 @bp.route('/insights/history')
+@login_required
 def insights_history():
     """View all insights including dismissed ones"""
     # Get filter parameters
@@ -102,7 +105,7 @@ def insights_history():
     show_dismissed = request.args.get('show_dismissed') == 'true'
 
     # Build query
-    query = FinancialInsight.query
+    query = FinancialInsight.query.filter(FinancialInsight.user_id == current_user.id)
 
     if severity:
         query = query.filter(FinancialInsight.severity == severity)
@@ -157,10 +160,12 @@ def spending_analysis():
                          end_date=end_date)
 
 @bp.route('/api/insights/summary')
+@login_required
 def api_insights_summary():
     """API endpoint for insights summary"""
     thirty_days_ago = datetime.now() - timedelta(days=30)
     insights = FinancialInsight.query.filter(
+        FinancialInsight.user_id == current_user.id,
         FinancialInsight.created_at >= thirty_days_ago,
         FinancialInsight.is_dismissed == False
     ).all()

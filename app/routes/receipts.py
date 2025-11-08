@@ -3,7 +3,7 @@ from flask_login import current_user, login_required
 from app.services.receipt_ocr import ReceiptOCRAgent
 from app.services.categorizer import TransactionCategorizer
 from app.models import Receipt, Transaction, Account, Category
-from app import db
+from app import db, limiter
 from werkzeug.utils import secure_filename
 from app.routes.settings import get_currency_info, get_current_currency
 import json
@@ -29,6 +29,7 @@ def index():
 
 @bp.route('/upload/<int:transaction_id>', methods=['GET', 'POST'])
 @login_required
+@limiter.limit("20 per hour")
 def upload(transaction_id):
     """Upload receipt for a transaction"""
     transaction = Transaction.query.get_or_404(transaction_id)

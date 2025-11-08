@@ -135,12 +135,38 @@ def login():
         user = User.query.filter_by(username=username).first()
 
         if user is None or not user.check_password(password):
+            # Log failed login attempt for security monitoring
+            current_app.logger.warning(
+                f'Failed login attempt',
+                extra={
+                    'username': username,
+                    'ip_address': request.remote_addr,
+                    'user_agent': request.headers.get('User-Agent', 'Unknown')
+                }
+            )
             flash('Invalid username or password', 'danger')
             return render_template('auth/login.html')
 
         if not user.is_active:
+            current_app.logger.warning(
+                f'Login attempt on inactive account',
+                extra={
+                    'username': username,
+                    'ip_address': request.remote_addr
+                }
+            )
             flash('This account has been deactivated', 'danger')
             return render_template('auth/login.html')
+
+        # Log successful login
+        current_app.logger.info(
+            f'Successful login',
+            extra={
+                'user_id': user.id,
+                'username': user.username,
+                'ip_address': request.remote_addr
+            }
+        )
 
         # Log in user
         login_user(user, remember=remember_me)

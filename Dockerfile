@@ -35,9 +35,9 @@ RUN chmod +x /app/entrypoint.sh
 # Expose the port Gunicorn will run on
 EXPOSE 5000
 
-# Set environment variables (can be overridden by docker-compose)
+# Set environment variables (can be overridden at runtime)
 ENV FLASK_APP="wsgi:app"
-ENV FLASK_ENV="development"
+ENV FLASK_ENV="production"
 
 # Run migrations and start the application
 ENTRYPOINT ["/app/entrypoint.sh"]

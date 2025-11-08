@@ -1,6 +1,7 @@
 from flask import Blueprint, send_file, request, redirect, url_for, flash
+from flask_login import login_required, current_user
 from app.models import Account, Transaction, Category
-from app import db
+from app import db, limiter
 import json
 import os
 from datetime import datetime
@@ -9,6 +10,8 @@ from pathlib import Path
 bp = Blueprint('backup', __name__, url_prefix='/backup')
 
 @bp.route('/export')
+@login_required
+@limiter.limit("5 per hour")
 def export_data():
     """Export all data to JSON file"""
     # Gather all data
@@ -62,6 +65,8 @@ def export_data():
     return send_file(filepath, as_attachment=True, download_name=filename)
 
 @bp.route('/import', methods=['POST'])
+@login_required
+@limiter.limit("10 per hour")
 def import_data():
     """Import data from JSON file"""
     if 'backup_file' not in request.files:

@@ -51,9 +51,19 @@ def list_transactions():
     if category_id:
         query = query.filter_by(category_id=category_id)
     if start_date:
-        query = query.filter(Transaction.date >= datetime.strptime(start_date, '%Y-%m-%d').date())
+        try:
+            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            query = query.filter(Transaction.date >= start_date_obj)
+        except ValueError:
+            current_app.logger.warning(f"Invalid start_date format: {start_date}")
+            flash('Invalid start date format. Please use YYYY-MM-DD', 'warning')
     if end_date:
-        query = query.filter(Transaction.date <= datetime.strptime(end_date, '%Y-%m-%d').date())
+        try:
+            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            query = query.filter(Transaction.date <= end_date_obj)
+        except ValueError:
+            current_app.logger.warning(f"Invalid end_date format: {end_date}")
+            flash('Invalid end date format. Please use YYYY-MM-DD', 'warning')
     if search:
         query = query.filter(Transaction.payee.ilike(f'%{search}%'))
 
@@ -117,7 +127,7 @@ def new_transaction():
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Error creating transaction: {e}", exc_info=True)
-            flash(f'Error creating transaction: {e}', 'danger')
+            flash('An error occurred while creating the transaction. Please try again.', 'danger')
             # Redirect to the form page or a generic error page
             return redirect(url_for('transactions.new_transaction'))
 
