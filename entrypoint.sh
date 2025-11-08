@@ -4,6 +4,9 @@ set -e
 # Set default PORT if not provided
 export PORT=${PORT:-5000}
 
+# Create data directory if it doesn't exist (for SQLite in development)
+mkdir -p /app/data
+
 # Try to run database migrations with a timeout
 echo "Running database migrations..."
 timeout 30 python -m flask db upgrade || {
