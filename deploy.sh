@@ -46,7 +46,8 @@ $GCLOUD run deploy $SERVICE_NAME \
     --memory=2Gi \
     --cpu=1 \
     --timeout=3600 \
-    --set-env-vars="FLASK_ENV=production,DATABASE_URL=sqlite:///instance/finance.db" \
+    --set-env-vars="FLASK_ENV=production,CLOUD_SQL_CONNECTION_NAME=jinolen:us-central1:finance-db,DB_USER=postgres,DB_NAME=finance" \
+    --set-secrets="DB_PASSWORD=finance-db-password:latest,SECRET_KEY=flask-secret-key:latest,GOOGLE_API_KEY=gemini-api-key:latest" \
     --port=5000
 
 # Step 5: Get service URL
