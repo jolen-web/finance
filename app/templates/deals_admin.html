@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-sync-alt"></i> BDO Deals Management</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>ℹ️ Current Status:</strong>
+                        <span id="status-text">Loading...</span>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5>Refresh Deals from BDO</h5>
+                        <p class="text-muted">
+                            Click the button below to fetch the latest credit card promotional campaigns
+                            directly from BDO's Perx API. This will replace the current deals with fresh data.
+                        </p>
+
+                        <button id="refresh-btn" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sync-alt"></i> Refresh Deals Now
+                        </button>
+                        <span id="loading-spinner" class="ms-2" style="display: none;">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            Fetching fresh data from BDO...
+                        </span>
+                    </div>
+
+                    <div id="result-container" style="display: none;">
+                        <hr>
+                        <h5>Refresh Result</h5>
+                        <div id="result-message" class="alert alert-success"></div>
+                        <div id="result-details" class="small text-muted"></div>
+                    </div>
+
+                    <hr>
+
+                    <h5>Statistics</h5>
+                    <div id="stats-container">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h3 id="stat-total">-</h3>
+                                        <small class="text-muted">Total Deals</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h3 id="stat-categories">-</h3>
+                                        <small class="text-muted">Categories</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h3 id="stat-avg-discount">-</h3>
+                                        <small class="text-muted">Avg Discount</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('refresh-btn').addEventListener('click', async function() {
+    const btn = this;
+    const spinner = document.getElementById('loading-spinner');
+    const resultContainer = document.getElementById('result-container');
+    const resultMessage = document.getElementById('result-message');
+    const resultDetails = document.getElementById('result-details');
+
+    // Disable button and show spinner
+    btn.disabled = true;
+    spinner.style.display = 'inline';
+    resultContainer.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/deals/refresh', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            resultMessage.className = 'alert alert-success';
+            resultMessage.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
+
+            resultDetails.innerHTML = `
+                <p><strong>Deals Updated:</strong> ${data.data.deals_updated}</p>
+                <p><strong>Timestamp:</strong> ${new Date(data.data.timestamp).toLocaleString()}</p>
+            `;
+        } else {
+            resultMessage.className = 'alert alert-danger';
+            resultMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error: ${data.error}`;
+        }
+
+        resultContainer.style.display = 'block';
+
+        // Reload stats
+        loadStats();
+
+    } catch (error) {
+        resultMessage.className = 'alert alert-danger';
+        resultMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i> Network Error: ${error.message}`;
+        resultContainer.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+    }
+});
+
+async function loadStats() {
+    try {
+        const response = await fetch('/api/deals/stats');
+        const data = await response.json();
+
+        if (data.success) {
+            const stats = data.data;
+            document.getElementById('stat-total').textContent = stats.total_deals;
+            document.getElementById('stat-categories').textContent = Object.keys(stats.by_category).length;
+            document.getElementById('stat-avg-discount').textContent =
+                stats.average_discount_percent.toFixed(1) + '%';
+
+            // Update status text
+            document.getElementById('status-text').innerHTML = `
+                <strong>${stats.total_deals} deals</strong> currently loaded from BDO
+            `;
+        }
+    } catch (error) {
+        console.error('Failed to load stats:', error);
+    }
+}
+
+// Load stats on page load
+loadStats();
+</script>
+
+<style>
+#refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.card-body h3 {
+    color: #007bff;
+}
+</style>
+{% endblock %}

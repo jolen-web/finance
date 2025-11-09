@@ -46,6 +46,13 @@ def deals():
     return render_template('deals.html')
 
 
+@bp.route('/deals-admin')
+@login_required
+def deals_admin():
+    """Admin panel to manage and refresh BDO deals"""
+    return render_template('deals_admin.html')
+
+
 @bp.route('/health')
 def health():
     """Health check endpoint for Cloud Run

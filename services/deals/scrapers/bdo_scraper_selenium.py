@@ -239,7 +239,7 @@ class BDOScraperSelenium:
                 except:
                     continue
 
-            # Description
+            # Description (short)
             for selector in ['p', '.description', '[class*="description"]']:
                 try:
                     desc = element.find_element(By.CSS_SELECTOR, selector).text
@@ -248,6 +248,27 @@ class BDOScraperSelenium:
                         break
                 except:
                     continue
+
+            # Image URL
+            for selector in ['img', 'img.deal-image', '[class*="image"] img', '[class*="thumbnail"] img']:
+                try:
+                    img = element.find_element(By.CSS_SELECTOR, selector)
+                    img_src = img.get_attribute('src') or img.get_attribute('data-src')
+                    if img_src:
+                        deal['image_url'] = urljoin(self.base_url, img_src)
+                        logger.info(f"Found image: {deal['image_url']}")
+                        break
+                except:
+                    continue
+
+            # Detailed description (full text)
+            try:
+                # Get all text from the element as detailed description
+                full_text = element.text
+                if len(full_text) > len(deal.get('description', '')):
+                    deal['detailed_description'] = full_text
+            except:
+                pass
 
             # Get all text for pattern matching
             text = element.text
@@ -286,16 +307,20 @@ class BDOScraperSelenium:
         max_score = 0.0
 
         if deal.get('title'):
-            score += 0.2
+            score += 0.15
         if deal.get('description'):
-            score += 0.2
-        max_score += 0.4
+            score += 0.15
+        if deal.get('image_url'):
+            score += 0.15
+        if deal.get('detailed_description'):
+            score += 0.15
+        max_score += 0.6
 
         if deal.get('cashback_percent'):
-            score += 0.2
+            score += 0.15
         if deal.get('url'):
-            score += 0.2
-        max_score += 0.4
+            score += 0.15
+        max_score += 0.3
 
         if deal.get('card_type'):
             score += 0.1

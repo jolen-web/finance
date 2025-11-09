@@ -30,6 +30,9 @@ class Deal(db.Model):
     # Additional details
     url = db.Column(db.String(500))  # Link to deal details
     promotion_details = db.Column(db.Text)  # Extra promotion details
+    detailed_description = db.Column(db.Text)  # Full promotion details/terms
+    image_url = db.Column(db.String(500))  # Image URL for the deal
+    merchant_logo_url = db.Column(db.String(500))  # Merchant/card issuer logo
     data_quality_score = db.Column(db.Float, default=0.5)  # 0-1 quality score
 
     # Metadata
@@ -49,6 +52,7 @@ class Deal(db.Model):
             'card_issuer': self.card_issuer,
             'title': self.title,
             'description': self.description,
+            'detailed_description': self.detailed_description,
             'merchant': self.merchant,
             'category': self.category,
             'card_type': self.card_type,
@@ -65,6 +69,8 @@ class Deal(db.Model):
                 'details': self.promotion_details,
             },
             'url': self.url,
+            'image_url': self.image_url,
+            'merchant_logo_url': self.merchant_logo_url,
             'quality_score': self.data_quality_score,
             'scraped_at': self.scraped_at.isoformat() if self.scraped_at else None,
             'is_active': self.is_active,

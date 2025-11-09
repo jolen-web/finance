@@ -198,7 +198,7 @@ class DealsWidget {
             background: white;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
-            padding: 1.5rem;
+            overflow: hidden;
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -213,6 +213,25 @@ class DealsWidget {
             card.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
             card.style.transform = 'translateY(0)';
         });
+
+        // Image section
+        if (deal.image_url) {
+            const imgWrapper = document.createElement('div');
+            imgWrapper.style.cssText = `
+                width: 100%;
+                height: 200px;
+                overflow: hidden;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            `;
+            imgWrapper.innerHTML = `
+                <img src="${deal.image_url}" alt="${deal.title}"
+                     style="width: 100%; height: 100%; object-fit: cover;">
+            `;
+            card.appendChild(imgWrapper);
+        }
+
+        const cardContent = document.createElement('div');
+        cardContent.style.cssText = 'padding: 1.5rem;';
 
         const discountBadge = this.createDiscountBadge(deal);
         const header = document.createElement('div');
@@ -248,9 +267,10 @@ class DealsWidget {
             </div>
         `;
 
-        card.appendChild(header);
-        card.appendChild(details);
-        card.appendChild(footer);
+        cardContent.appendChild(header);
+        cardContent.appendChild(details);
+        cardContent.appendChild(footer);
+        card.appendChild(cardContent);
 
         card.addEventListener('click', () => this.showDealModal(deal));
 
@@ -354,10 +374,18 @@ class DealsWidget {
                 <button onclick="this.closest('[style*=position]').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">×</button>
             </div>
 
+            ${deal.image_url ? `
+                <div style="margin-bottom: 1.5rem; border-radius: 8px; overflow: hidden;">
+                    <img src="${deal.image_url}" alt="${deal.title}"
+                         style="width: 100%; max-height: 300px; object-fit: cover; display: block;">
+                </div>
+            ` : ''}
+
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; text-align: center;">
                 ${deal.discount.percent ? `<div style="font-size: 3rem; font-weight: bold;">${deal.discount.percent}% OFF</div>` : ''}
                 ${deal.discount.type === 'BOGO' ? `<div style="font-size: 2rem; font-weight: bold;">Buy One, Get One</div>` : ''}
                 ${deal.discount.cashback ? `<div style="font-size: 2rem; font-weight: bold;">${deal.discount.cashback}% Cashback</div>` : ''}
+                ${deal.discount.points ? `<div style="font-size: 2rem; font-weight: bold;">${deal.discount.points} Points</div>` : ''}
             </div>
 
             <div style="margin-bottom: 1.5rem;">
@@ -365,10 +393,17 @@ class DealsWidget {
                 <p style="color: #666; line-height: 1.6;">${deal.description}</p>
             </div>
 
+            ${deal.detailed_description ? `
+                <div style="margin-bottom: 1.5rem; background: #f9f9f9; padding: 1rem; border-radius: 6px; border-left: 4px solid #667eea;">
+                    <h3 style="color: #333; margin-bottom: 0.5rem;">Full Details</h3>
+                    <p style="color: #666; white-space: pre-wrap; line-height: 1.6; word-break: break-word;">${deal.detailed_description}</p>
+                </div>
+            ` : ''}
+
             ${deal.promotion?.details ? `
                 <div style="margin-bottom: 1.5rem;">
-                    <h3 style="color: #333; margin-bottom: 0.5rem;">Details</h3>
-                    <p style="color: #666;">${deal.promotion.details}</p>
+                    <h3 style="color: #333; margin-bottom: 0.5rem;">Promotion Details</h3>
+                    <p style="color: #666; line-height: 1.6;">${deal.promotion.details}</p>
                 </div>
             ` : ''}
 
@@ -394,7 +429,7 @@ class DealsWidget {
             ${deal.url ? `
                 <div style="text-align: center;">
                     <a href="${deal.url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.75rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 500; transition: transform 0.2s ease;">
-                        View Details →
+                        View Details on BDO Website →
                     </a>
                 </div>
             ` : ''}

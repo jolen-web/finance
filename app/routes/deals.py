@@ -233,3 +233,52 @@ def get_stats():
             'success': False,
             'error': str(e)
         }), 500
+
+
+@deals_bp.route('/refresh', methods=['POST'])
+@login_required
+def refresh_deals():
+    """
+    Admin endpoint to refresh deals from BDO Perx API
+
+    This fetches the latest promotional campaigns from BDO's backend
+    and updates the database with fresh data.
+    """
+    try:
+        from services.deals.scrapers.bdo_perx_api_scraper import BDOPerxScraper
+
+        # Fetch fresh data from BDO
+        scraper = BDOPerxScraper()
+        fresh_deals = scraper.scrape()
+
+        if not fresh_deals:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch deals from BDO API'
+            }), 500
+
+        # Clear old deals
+        Deal.query.delete()
+        db.session.commit()
+
+        # Insert fresh deals
+        for deal_data in fresh_deals:
+            deal = Deal(**deal_data)
+            db.session.add(deal)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Successfully refreshed {len(fresh_deals)} deals from BDO',
+            'data': {
+                'deals_updated': len(fresh_deals),
+                'timestamp': __import__('datetime').datetime.utcnow().isoformat()
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
