@@ -29,8 +29,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY . .
 
-# Create data directory with proper permissions
-RUN mkdir -p /app/data && chmod 755 /app/data
+# Create and configure data directory with proper permissions
+RUN mkdir -p /app/data && chmod 777 /app/data
 
 # Make entrypoint script executable
 RUN chmod +x /app/entrypoint.sh

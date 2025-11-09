@@ -32,6 +32,9 @@ from app.models.preferences import DashboardPreferences
 # Feedback
 from app.models.feedback import Feedback
 
+# Deals and promotions
+from app.models.deal import Deal
+
 # Export all models
 __all__ = [
     # Base
@@ -64,4 +67,7 @@ __all__ = [
 
     # Feedback
     'Feedback',
+
+    # Deals
+    'Deal',
 ]

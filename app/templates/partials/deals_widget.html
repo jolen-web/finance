@@ -1,0 +1,109 @@
+<!-- Deals Widget Partial - Add to dashboard -->
+<div class="deals-widget-container" style="margin-top: 2rem;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h3 style="margin: 0 0 0.5rem 0;">💳 Credit Card Deals</h3>
+            <p style="margin: 0; opacity: 0.9;">Discover the latest offers and promotions</p>
+        </div>
+        <a href="{{ url_for('main.deals') }}" style="background: white; color: #667eea; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 500; white-space: nowrap; display: inline-block;">
+            View All Deals →
+        </a>
+    </div>
+
+    <!-- Quick Stats -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem;">
+        <div style="background: white; border: 1px solid #e0e0e0; padding: 1rem; border-radius: 8px; text-align: center;">
+            <div style="font-size: 1.8rem; font-weight: bold; color: #667eea;" id="widget-total-deals">0</div>
+            <div style="color: #999; font-size: 0.9rem; margin-top: 0.25rem;">Active Deals</div>
+        </div>
+        <div style="background: white; border: 1px solid #e0e0e0; padding: 1rem; border-radius: 8px; text-align: center;">
+            <div style="font-size: 1.8rem; font-weight: bold; color: #667eea;" id="widget-avg-discount">0%</div>
+            <div style="color: #999; font-size: 0.9rem; margin-top: 0.25rem;">Avg. Discount</div>
+        </div>
+        <div style="background: white; border: 1px solid #e0e0e0; padding: 1rem; border-radius: 8px; text-align: center;">
+            <div style="font-size: 1.8rem; font-weight: bold; color: #667eea;" id="widget-categories">0</div>
+            <div style="color: #999; font-size: 0.9rem; margin-top: 0.25rem;">Categories</div>
+        </div>
+    </div>
+
+    <!-- Featured Deals Preview -->
+    <div style="margin-top: 1rem;">
+        <h4 style="color: #333; margin-bottom: 1rem;">🌟 Featured Deals</h4>
+        <div id="featured-deals-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+            <!-- Will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // Load deals widget data
+    async function loadDealsWidget() {
+        try {
+            // Load stats
+            const statsRes = await fetch('/api/deals/stats');
+            const statsData = await statsRes.json();
+
+            if (statsData.success) {
+                const stats = statsData.data;
+                document.getElementById('widget-total-deals').textContent = stats.total_deals;
+                document.getElementById('widget-avg-discount').textContent = Math.round(stats.average_discount_percent) + '%';
+                document.getElementById('widget-categories').textContent = Object.keys(stats.by_category).length;
+            }
+
+            // Load featured deals (top 3 by discount)
+            const dealsRes = await fetch('/api/deals?limit=3&sort_by=discount');
+            const dealsData = await dealsRes.json();
+
+            if (dealsData.success && dealsData.data.length > 0) {
+                const featuredList = document.getElementById('featured-deals-list');
+                featuredList.innerHTML = '';
+
+                dealsData.data.forEach(deal => {
+                    const card = document.createElement('div');
+                    card.style.cssText = `
+                        background: white;
+                        border: 1px solid #e0e0e0;
+                        border-radius: 8px;
+                        padding: 1rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    `;
+
+                    const discount = deal.discount.percent ? `${deal.discount.percent}% OFF` : 'Special Deal';
+
+                    card.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                            <h5 style="margin: 0; font-size: 0.95rem; color: #333; flex: 1;">${deal.title}</h5>
+                            <div style="background: #667eea; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; white-space: nowrap; margin-left: 0.5rem;">${discount}</div>
+                        </div>
+                        <p style="margin: 0.5rem 0; font-size: 0.9rem; color: #666; line-height: 1.3;">${deal.description}</p>
+                        <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #999;">
+                            ${deal.merchant ? `<span>${deal.merchant}</span>` : ''}
+                        </div>
+                    `;
+
+                    card.addEventListener('mouseenter', () => {
+                        card.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                        card.style.transform = 'translateY(-2px)';
+                    });
+
+                    card.addEventListener('mouseleave', () => {
+                        card.style.boxShadow = 'none';
+                        card.style.transform = 'translateY(0)';
+                    });
+
+                    featuredList.appendChild(card);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading deals widget:', error);
+        }
+    }
+
+    // Load widget when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadDealsWidget);
+    } else {
+        loadDealsWidget();
+    }
+</script>

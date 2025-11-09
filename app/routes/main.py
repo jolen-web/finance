@@ -32,6 +32,20 @@ def dashboard():
 
     return render_template('dashboard.html', **dashboard_data, prefs=prefs)
 
+@bp.route('/dashboard')
+@login_required
+def view_dashboard():
+    """Dashboard route with explicit name"""
+    return dashboard()
+
+
+@bp.route('/deals')
+@login_required
+def deals():
+    """View all credit card deals and promotions"""
+    return render_template('deals.html')
+
+
 @bp.route('/health')
 def health():
     """Health check endpoint for Cloud Run

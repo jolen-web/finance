@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Credit Card Deals - Finance Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .deals-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .deals-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .deals-title h2 {
+        margin: 0 0 0.5rem 0;
+        font-size: 2rem;
+    }
+
+    .deals-title p {
+        margin: 0;
+        opacity: 0.9;
+    }
+
+    .deals-controls {
+        margin-top: 1.5rem;
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .deals-search-input {
+        flex: 1;
+        min-width: 200px;
+        padding: 0.75rem 1rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+    }
+
+    .deals-filter-select {
+        padding: 0.75rem 1rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        background-color: white;
+        color: #333;
+    }
+
+    .deals-filters {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .deals-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .deal-card {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .deal-card:hover {
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        transform: translateY(-4px);
+    }
+
+    .deal-card h3 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.1rem;
+        color: #333;
+    }
+
+    .deals-pagination {
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-top: 2rem;
+    }
+
+    .deals-pagination button {
+        padding: 0.5rem 1rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: white;
+        color: #666;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .deals-pagination button.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: #667eea;
+    }
+
+    .deals-pagination button:hover {
+        border-color: #667eea;
+    }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .stats-section {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .stat-card h4 {
+        margin: 0 0 0.5rem 0;
+        font-size: 2rem;
+        font-weight: bold;
+    }
+
+    .stat-card p {
+        margin: 0;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="deals-container">
+    <div id="deals-widget"></div>
+
+    <!-- Stats Section -->
+    <div class="stats-section">
+        <h3>📊 Deals Overview</h3>
+        <div id="deals-stats-container" class="stats-grid">
+            <div class="stat-card">
+                <h4 id="stat-total">0</h4>
+                <p>Total Deals</p>
+            </div>
+            <div class="stat-card">
+                <h4 id="stat-avg-discount">0%</h4>
+                <p>Avg. Discount</p>
+            </div>
+            <div class="stat-card">
+                <h4 id="stat-categories">0</h4>
+                <p>Categories</p>
+            </div>
+            <div class="stat-card">
+                <h4 id="stat-issuers">0</h4>
+                <p>Card Issuers</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/deals.js') }}"></script>
+<script>
+    // Load and display statistics
+    async function loadStats() {
+        try {
+            const response = await fetch('/api/deals/stats');
+            const data = await response.json();
+
+            if (data.success) {
+                const stats = data.data;
+                document.getElementById('stat-total').textContent = stats.total_deals;
+                document.getElementById('stat-avg-discount').textContent = Math.round(stats.average_discount_percent) + '%';
+                document.getElementById('stat-categories').textContent = Object.keys(stats.by_category).length;
+                document.getElementById('stat-issuers').textContent = Object.keys(stats.by_issuer).length;
+            }
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
+    }
+
+    // Load stats when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadStats);
+    } else {
+        loadStats();
+    }
+</script>
+{% endblock %}
