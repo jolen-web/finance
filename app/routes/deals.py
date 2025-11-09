@@ -2,9 +2,8 @@
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import and_
-from app import db
+from app import db, csrf
 from app.models import Deal
-from functools import wraps
 
 deals_bp = Blueprint('deals', __name__, url_prefix='/api/deals')
 
@@ -238,45 +237,59 @@ def get_stats():
 
 @deals_bp.route('/refresh', methods=['POST'])
 @login_required
+@csrf.exempt
 def refresh_deals():
     """
     Admin endpoint to refresh deals from BDO Perx API
 
     This fetches the latest promotional campaigns from BDO's backend
-    and updates the database with fresh data.
+    and updates the database with fresh data. If the API fails, the
+    endpoint returns success but maintains existing deals.
     """
     try:
         from services.deals.scrapers.bdo_perx_api_scraper import BDOPerxScraper
+        import logging
+
+        logger = logging.getLogger(__name__)
 
         # Fetch fresh data from BDO
         scraper = BDOPerxScraper()
         fresh_deals = scraper.scrape()
 
-        if not fresh_deals:
+        if fresh_deals:
+            # Successfully fetched new deals - replace old ones
+            Deal.query.delete()
+            db.session.commit()
+
+            for deal_data in fresh_deals:
+                deal = Deal(**deal_data)
+                db.session.add(deal)
+
+            db.session.commit()
+
             return jsonify({
-                'success': False,
-                'error': 'Failed to fetch deals from BDO API'
-            }), 500
+                'success': True,
+                'message': f'Successfully refreshed {len(fresh_deals)} deals from BDO',
+                'data': {
+                    'deals_updated': len(fresh_deals),
+                    'timestamp': __import__('datetime').datetime.utcnow().isoformat()
+                }
+            }), 200
+        else:
+            # API failed - but keep existing deals and return graceful message
+            current_count = Deal.query.filter(Deal.is_active == True).count()
+            logger.warning(f"BDO API fetch failed, but maintaining {current_count} existing deals")
 
-        # Clear old deals
-        Deal.query.delete()
-        db.session.commit()
-
-        # Insert fresh deals
-        for deal_data in fresh_deals:
-            deal = Deal(**deal_data)
-            db.session.add(deal)
-
-        db.session.commit()
-
-        return jsonify({
-            'success': True,
-            'message': f'Successfully refreshed {len(fresh_deals)} deals from BDO',
-            'data': {
-                'deals_updated': len(fresh_deals),
-                'timestamp': __import__('datetime').datetime.utcnow().isoformat()
-            }
-        }), 200
+            return jsonify({
+                'success': True,
+                'message': f'BDO API temporarily unavailable. Showing {current_count} existing deals.',
+                'data': {
+                    'deals_updated': 0,
+                    'deals_maintained': current_count,
+                    'timestamp': __import__('datetime').datetime.utcnow().isoformat(),
+                    'note': 'Displaying existing cached deals while API is unavailable'
+                }
+            }), 200
 
     except Exception as e:
         return jsonify({

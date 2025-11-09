@@ -103,13 +103,24 @@ document.getElementById('refresh-btn').addEventListener('click', async function(
         const data = await response.json();
 
         if (data.success) {
-            resultMessage.className = 'alert alert-success';
-            resultMessage.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
+            // Success - but could be fresh data or cached data
+            const isUpdated = data.data.deals_updated > 0;
+            const alertClass = isUpdated ? 'alert-success' : 'alert-info';
+            const icon = isUpdated ? 'fa-check-circle' : 'fa-info-circle';
 
-            resultDetails.innerHTML = `
-                <p><strong>Deals Updated:</strong> ${data.data.deals_updated}</p>
-                <p><strong>Timestamp:</strong> ${new Date(data.data.timestamp).toLocaleString()}</p>
-            `;
+            resultMessage.className = `alert ${alertClass}`;
+            resultMessage.innerHTML = `<i class="fas ${icon}"></i> ${data.message}`;
+
+            let detailsHTML = '';
+            if (isUpdated) {
+                detailsHTML += `<p><strong>Deals Updated:</strong> ${data.data.deals_updated}</p>`;
+            } else if (data.data.deals_maintained) {
+                detailsHTML += `<p><strong>Deals Maintained:</strong> ${data.data.deals_maintained}</p>`;
+                detailsHTML += `<p><em>${data.data.note || 'Using cached deals while API is unavailable'}</em></p>`;
+            }
+            detailsHTML += `<p><strong>Timestamp:</strong> ${new Date(data.data.timestamp).toLocaleString()}</p>`;
+
+            resultDetails.innerHTML = detailsHTML;
         } else {
             resultMessage.className = 'alert alert-danger';
             resultMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error: ${data.error}`;
