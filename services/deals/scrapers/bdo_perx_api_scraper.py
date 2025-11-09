@@ -160,6 +160,10 @@ class BDOPerxScraper:
             if category_tags and isinstance(category_tags, list) and len(category_tags) > 0:
                 category = category_tags[0].get('title', 'General')
 
+            # Extract campaign ID for direct deal link
+            campaign_id = deal_data.get('id', '')
+            direct_url = f'https://www.deals.bdo.com.ph/treat-welcome/{campaign_id}' if campaign_id else 'https://www.deals.bdo.com.ph'
+
             # Map Perx campaign fields to our schema
             parsed = {
                 'source': 'bdo_perx_api',
@@ -177,7 +181,7 @@ class BDOPerxScraper:
                 'cashback_percent': None,
                 'promotion_start_date': deal_data.get('begins_at', ''),
                 'promotion_end_date': deal_data.get('ends_at', ''),
-                'url': 'https://www.deals.bdo.com.ph',
+                'url': direct_url,
                 'promotion_details': deal_data.get('terms_and_conditions', ''),
                 'image_url': '',
                 'merchant_logo_url': '',
