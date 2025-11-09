@@ -25,10 +25,12 @@ class BDOPerxScraper:
         self.timeout = timeout
         self.session = requests.Session()
         self.access_token = None
+        self.bearer_token = None
         self.deals = []
 
         # BDO endpoints
-        self.token_url = "https://www.deals.bdo.com.ph/v2/oauth/token"
+        self.config_url = "https://www.deals.bdo.com.ph/assets/config/app-config.json"
+        self.token_v4_url = "https://www.deals.bdo.com.ph/v4/oauth/token"
         self.api_base = "https://api.perxtech.net"
 
         # Headers
@@ -39,35 +41,57 @@ class BDOPerxScraper:
         })
 
     def get_token(self) -> bool:
-        """Get OAuth token from BDO"""
-        logger.info("🔐 Getting OAuth token from BDO...")
+        """Get OAuth v4 bearer token from BDO"""
+        logger.info("🔐 Getting OAuth v4 token from BDO...")
 
         try:
-            payload = {"url": "www.deals.bdo.com.ph"}
-            response = self.session.post(
-                self.token_url,
+            # Step 1: Get app config to extract identifier
+            logger.info("📋 Fetching app config...")
+            config_response = self.session.get(
+                self.config_url,
+                timeout=self.timeout
+            )
+
+            if config_response.status_code != 200:
+                logger.error(f"❌ Failed to get app config: {config_response.status_code}")
+                return False
+
+            config_data = config_response.json()
+            identifier = config_data.get('custom', {}).get('pi')
+
+            if not identifier:
+                logger.error("❌ No identifier found in app config")
+                return False
+
+            logger.info(f"✅ Got identifier: {identifier[:20]}...")
+
+            # Step 2: Get v4 bearer token with identifier
+            logger.info("🔐 Requesting v4 bearer token...")
+            payload = {"url": "www.deals.bdo.com.ph", "identifier": identifier}
+            token_response = self.session.post(
+                self.token_v4_url,
                 json=payload,
                 timeout=self.timeout
             )
 
-            if response.status_code == 200:
-                data = response.json()
-                self.access_token = data.get('access_token')
+            if token_response.status_code == 200:
+                data = token_response.json()
+                self.bearer_token = data.get('bearer_token')
 
-                if self.access_token:
-                    logger.info(f"✅ Token obtained: {self.access_token[:20]}...")
+                if self.bearer_token:
+                    logger.info(f"✅ Bearer token obtained: {self.bearer_token[:30]}...")
                     # Add token to headers
                     self.session.headers.update({
-                        'Authorization': f'Bearer {self.access_token}'
+                        'Authorization': f'Bearer {self.bearer_token}'
                     })
                     return True
                 else:
-                    logger.warning("⚠️  No access_token in response")
+                    logger.warning("⚠️  No bearer_token in response")
                     logger.debug(f"Response: {data}")
                     return False
             else:
-                logger.error(f"❌ Token request failed: {response.status_code}")
-                logger.debug(f"Response: {response.text}")
+                logger.error(f"❌ Token request failed: {token_response.status_code}")
+                logger.debug(f"Response: {token_response.text}")
                 return False
 
         except Exception as e:
@@ -75,85 +99,89 @@ class BDOPerxScraper:
             return False
 
     def fetch_deals(self, category: str = "dine", card_type: str = "credit-card") -> bool:
-        """Fetch deals from Perx API"""
-        logger.info(f"📥 Fetching deals (category={category}, card_type={card_type})...")
+        """Fetch campaigns from Perx API"""
+        logger.info(f"📥 Fetching campaigns...")
 
-        if not self.access_token:
-            logger.error("❌ No access token. Run get_token() first")
+        if not self.bearer_token:
+            logger.error("❌ No bearer token. Run get_token() first")
             return False
 
         try:
-            # Try different Perx API endpoints
-            endpoints = [
-                f"{self.api_base}/v4/deals?category={category}&cardType={card_type}",
-                f"{self.api_base}/v4/deals?category={category}",
-                f"{self.api_base}/v4/deals",
-                f"{self.api_base}/v3/deals",
-            ]
+            # Fetch campaigns from Perx API
+            endpoint = f"{self.api_base}/v4/campaigns/?size=100"
+            logger.info(f"Trying: {endpoint}")
+            response = self.session.get(endpoint, timeout=self.timeout)
 
-            for endpoint in endpoints:
-                logger.info(f"Trying: {endpoint}")
-                response = self.session.get(endpoint, timeout=self.timeout)
+            logger.info(f"Status: {response.status_code}")
 
-                logger.info(f"Status: {response.status_code}")
+            if response.status_code == 200:
+                data = response.json()
 
-                if response.status_code == 200:
-                    data = response.json()
+                # Parse response based on structure
+                if isinstance(data, list):
+                    self.deals = data
+                elif isinstance(data, dict):
+                    # Wrapped in 'data' key
+                    self.deals = data.get('data', [])
 
-                    # Parse response based on structure
-                    if isinstance(data, list):
-                        self.deals = data
-                    elif isinstance(data, dict):
-                        # Could be wrapped in 'data' or 'deals' key
-                        self.deals = data.get('data', data.get('deals', []))
+                if self.deals:
+                    logger.info(f"✅ Found {len(self.deals)} campaigns")
+                    return True
+                else:
+                    logger.warning(f"⚠️  Empty response from API")
+                    return False
 
-                    if self.deals:
-                        logger.info(f"✅ Found {len(self.deals)} deals")
-                        return True
-                    else:
-                        logger.warning(f"⚠️  Empty response from {endpoint}")
-                        continue
+            elif response.status_code == 401:
+                logger.error("❌ Unauthorized (401) - token may be expired")
+                return False
 
-                elif response.status_code == 401:
-                    logger.warning("⚠️  Unauthorized (401) - token may be expired")
-                    continue
-
-                elif response.status_code == 404:
-                    logger.warning(f"⚠️  Not found (404) - trying next endpoint")
-                    continue
-
-            logger.error("❌ All endpoints failed")
-            return False
+            elif response.status_code == 404:
+                logger.error(f"❌ Not found (404)")
+                return False
+            else:
+                logger.error(f"❌ HTTP {response.status_code}: {response.text[:100]}")
+                return False
 
         except Exception as e:
-            logger.error(f"❌ Error fetching deals: {e}")
+            logger.error(f"❌ Error fetching campaigns: {e}")
             return False
 
     def parse_deal(self, deal_data: Dict) -> Optional[Dict]:
-        """Parse individual deal from Perx API response"""
+        """Parse individual campaign from Perx API response"""
         try:
-            # Map Perx field names to our schema
+            # Extract merchant name if it's an object
+            merchant = deal_data.get('merchant', '')
+            if isinstance(merchant, dict):
+                merchant = merchant.get('name', '')
+
+            # Extract category tags if available
+            category = 'General'
+            category_tags = deal_data.get('category_tags', [])
+            if category_tags and isinstance(category_tags, list) and len(category_tags) > 0:
+                category = category_tags[0].get('title', 'General')
+
+            # Map Perx campaign fields to our schema
             parsed = {
                 'source': 'bdo_perx_api',
-                'card_issuer': deal_data.get('issuer', 'BDO'),
-                'title': deal_data.get('title', deal_data.get('name', '')),
-                'description': deal_data.get('description', deal_data.get('shortDescription', '')),
-                'detailed_description': deal_data.get('details', deal_data.get('longDescription', '')),
-                'merchant': deal_data.get('merchant', deal_data.get('partnerName', '')),
-                'category': deal_data.get('category', 'General'),
-                'card_type': deal_data.get('cardType', deal_data.get('card_type', 'Credit Card')),
-                'discount_type': deal_data.get('discountType', 'percentage'),
-                'discount_percent': deal_data.get('discountPercent', deal_data.get('discount', None)),
-                'discount_amount': deal_data.get('discountAmount', None),
-                'reward_points': deal_data.get('rewardPoints', deal_data.get('points', None)),
-                'cashback_percent': deal_data.get('cashbackPercent', deal_data.get('cashback', None)),
-                'promotion_start_date': deal_data.get('startDate', deal_data.get('validFrom', '')),
-                'promotion_end_date': deal_data.get('endDate', deal_data.get('validUntil', '')),
-                'url': deal_data.get('url', deal_data.get('link', 'https://www.deals.bdo.com.ph')),
-                'promotion_details': deal_data.get('terms', deal_data.get('conditions', '')),
-                'image_url': deal_data.get('imageUrl', deal_data.get('image', deal_data.get('thumbnail', ''))),
-                'merchant_logo_url': deal_data.get('partnerLogo', deal_data.get('logo', '')),
-                'data_quality_score': deal_data.get('qualityScore', 0.85),
+                'card_issuer': 'BDO',
+                'title': deal_data.get('name', deal_data.get('title', '')),
+                'description': deal_data.get('description', ''),
+                'detailed_description': deal_data.get('description', ''),
+                'merchant': merchant,
+                'category': category,
+                'card_type': 'Credit Card',
+                'discount_type': 'promotional',
+                'discount_percent': None,
+                'discount_amount': None,
+                'reward_points': None,
+                'cashback_percent': None,
+                'promotion_start_date': deal_data.get('begins_at', ''),
+                'promotion_end_date': deal_data.get('ends_at', ''),
+                'url': 'https://www.deals.bdo.com.ph',
+                'promotion_details': deal_data.get('terms_and_conditions', ''),
+                'image_url': '',
+                'merchant_logo_url': '',
+                'data_quality_score': 0.85,
             }
 
             # Only keep deals with at least a title
@@ -162,7 +190,7 @@ class BDOPerxScraper:
             return None
 
         except Exception as e:
-            logger.warning(f"Error parsing deal: {e}")
+            logger.warning(f"Error parsing campaign: {e}")
             return None
 
     def process_deals(self) -> List[Dict]:
