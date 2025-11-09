@@ -1,12 +1,18 @@
 import os
 from pathlib import Path
 
-basedir = Path(__file__).resolve().parent.parent
+basedir = Path(__file__).resolve().parent
 
 class Config:
+    # For local development, use a default SECRET_KEY if not set
     SECRET_KEY = os.environ.get('SECRET_KEY')
     if not SECRET_KEY:
-        raise ValueError("No SECRET_KEY set for Flask application")
+        FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
+        if FLASK_ENV == 'development':
+            # Use a default development key for local testing
+            SECRET_KEY = 'dev-secret-key-change-in-production'
+        else:
+            raise ValueError("No SECRET_KEY set for Flask application in production")
 
     # Database configuration
     FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
