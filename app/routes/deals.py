@@ -4,6 +4,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import and_
 from app import db
 from app.models import Deal
+from functools import wraps
 
 deals_bp = Blueprint('deals', __name__, url_prefix='/api/deals')
 

@@ -88,10 +88,15 @@ document.getElementById('refresh-btn').addEventListener('click', async function(
     resultContainer.style.display = 'none';
 
     try {
+        // Get CSRF token from cookie
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ||
+                         getCookie('XSRF-TOKEN');
+
         const response = await fetch('/api/deals/refresh', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken || ''
             }
         });
 
@@ -149,6 +154,19 @@ async function loadStats() {
 
 // Load stats on page load
 loadStats();
+
+// Helper function to get cookie by name
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.indexOf(nameEQ) === 0) {
+            return cookie.substring(nameEQ.length);
+        }
+    }
+    return '';
+}
 </script>
 
 <style>
