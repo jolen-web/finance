@@ -14,7 +14,46 @@ timeout 30 python -m flask db upgrade || {
   if [ $migration_status -eq 124 ]; then
     echo "Warning: Migration timed out after 30 seconds, continuing without migrations..."
   elif [ $migration_status -ne 0 ]; then
-    echo "Warning: Migration failed with status $migration_status, continuing anyway..."
+    echo "Warning: Migration failed with status $migration_status"
+    echo "Attempting to resolve conflicting migration heads..."
+
+    # Try to fix conflicting migration heads by updating the database directly
+    python << 'PYEOF'
+import os
+from app import create_app, db
+from sqlalchemy import text
+
+try:
+    app = create_app()
+    with app.app_context():
+        # Check if there are conflicting migration heads
+        result = db.session.execute(text("SELECT version_num FROM alembic_version ORDER BY version_num"))
+        current_versions = [row[0] for row in result]
+
+        if len(current_versions) > 1:
+            print(f"Found {len(current_versions)} migration heads. Consolidating...")
+            print(f"Current versions: {current_versions}")
+
+            # Delete all migration records
+            db.session.execute(text("DELETE FROM alembic_version"))
+            # Insert only the merge_branches head
+            db.session.execute(text("INSERT INTO alembic_version (version_num) VALUES ('merge_branches')"))
+            db.session.commit()
+
+            print("Migration heads consolidated. Now trying upgrade again...")
+
+            # Try upgrade again
+            import subprocess
+            result = subprocess.run(['/app/.venv/bin/python', '-m', 'flask', 'db', 'upgrade'],
+                                  env=dict(os.environ, FLASK_APP='app'))
+            if result.returncode == 0:
+                print("Migration successful after consolidation!")
+            else:
+                print("Migration still failed after consolidation, continuing anyway...")
+except Exception as e:
+    print(f"Error resolving migration conflict: {e}")
+    print("Continuing with application startup anyway...")
+PYEOF
   fi
 }
 
