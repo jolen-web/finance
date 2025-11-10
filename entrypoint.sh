@@ -34,22 +34,26 @@ try:
             print(f"Found {len(current_versions)} migration heads. Consolidating...")
             print(f"Current versions: {current_versions}")
 
-            # Delete all migration records
+            # Need to consolidate to merge_branches but also apply all pending migrations
+            # First, consolidate the heads to merge_branches
             db.session.execute(text("DELETE FROM alembic_version"))
-            # Insert only the merge_branches head
             db.session.execute(text("INSERT INTO alembic_version (version_num) VALUES ('merge_branches')"))
             db.session.commit()
 
-            print("Migration heads consolidated. Now trying upgrade again...")
+            print("Migration heads consolidated to merge_branches. Applying all pending migrations...")
 
-            # Try upgrade again
+            # Now apply all migrations from merge_branches onward
             import subprocess
-            result = subprocess.run(['python', '-m', 'flask', 'db', 'upgrade'],
-                                  env=dict(os.environ, FLASK_APP='app'))
-            if result.returncode == 0:
-                print("Migration successful after consolidation!")
-            else:
-                print("Migration still failed after consolidation, continuing anyway...")
+            for attempt in range(2):
+                result = subprocess.run(['python', '-m', 'flask', 'db', 'upgrade'],
+                                      env=dict(os.environ, FLASK_APP='app'))
+                if result.returncode == 0:
+                    print("All migrations applied successfully!")
+                    break
+                elif attempt == 0:
+                    print("First upgrade attempt failed, retrying...")
+                else:
+                    print("Migration still failed after retry, continuing anyway...")
 except Exception as e:
     print(f"Error resolving migration conflict: {e}")
     print("Continuing with application startup anyway...")
