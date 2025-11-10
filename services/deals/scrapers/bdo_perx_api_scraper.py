@@ -99,60 +99,78 @@ class BDOPerxScraper:
             return False
 
     def fetch_deals(self, category: str = "dine", card_type: str = "credit-card") -> bool:
-        """Fetch campaigns from Perx API"""
-        logger.info(f"📥 Fetching campaigns...")
+        """Fetch rewards from Perx catalogs API with pagination"""
+        logger.info(f"📥 Fetching rewards from catalogs...")
 
         if not self.bearer_token:
             logger.error("❌ No bearer token. Run get_token() first")
             return False
 
         try:
-            # Fetch campaigns from Perx API
-            endpoint = f"{self.api_base}/v4/campaigns/?size=100"
-            logger.info(f"Trying: {endpoint}")
-            response = self.session.get(endpoint, timeout=self.timeout)
+            all_deals = []
+            page = 1
+            total_pages = 1
 
-            logger.info(f"Status: {response.status_code}")
+            while page <= total_pages:
+                # Fetch catalog items page
+                endpoint = f"{self.api_base}/v4/catalogs/1/items?page={page}&size=20&category_ids=1"
+                logger.info(f"📄 Fetching page {page}: {endpoint}")
+                response = self.session.get(endpoint, timeout=self.timeout)
 
-            if response.status_code == 200:
+                if response.status_code != 200:
+                    logger.error(f"❌ HTTP {response.status_code}: {response.text[:100]}")
+                    break
+
                 data = response.json()
 
-                # Parse response based on structure
-                if isinstance(data, list):
-                    self.deals = data
-                elif isinstance(data, dict):
-                    # Wrapped in 'data' key
-                    self.deals = data.get('data', [])
+                # Get pagination info
+                meta = data.get('meta', {})
+                total_pages = meta.get('total_pages', 1)
+                items = data.get('data', [])
 
-                if self.deals:
-                    logger.info(f"✅ Found {len(self.deals)} campaigns")
-                    return True
-                else:
-                    logger.warning(f"⚠️  Empty response from API")
-                    return False
+                logger.info(f"✅ Page {page}/{total_pages}: Found {len(items)} catalog items")
 
-            elif response.status_code == 401:
-                logger.error("❌ Unauthorized (401) - token may be expired")
-                return False
+                # Fetch reward details for each catalog item
+                for item in items:
+                    item_id = item.get('item_id')
+                    if not item_id:
+                        continue
 
-            elif response.status_code == 404:
-                logger.error(f"❌ Not found (404)")
-                return False
+                    try:
+                        # Fetch reward details
+                        reward_endpoint = f"{self.api_base}/v4/rewards/{item_id}"
+                        reward_response = self.session.get(reward_endpoint, timeout=self.timeout)
+
+                        if reward_response.status_code == 200:
+                            reward_data = reward_response.json().get('data', {})
+                            if reward_data.get('name'):
+                                all_deals.append(reward_data)
+                        else:
+                            logger.debug(f"⚠️  Could not fetch reward {item_id}: {reward_response.status_code}")
+                    except Exception as e:
+                        logger.debug(f"⚠️  Error fetching reward {item_id}: {e}")
+                        continue
+
+                page += 1
+
+            self.deals = all_deals
+
+            if self.deals:
+                logger.info(f"✅ Found {len(self.deals)} rewards total")
+                return True
             else:
-                logger.error(f"❌ HTTP {response.status_code}: {response.text[:100]}")
+                logger.warning(f"⚠️  Empty response from API")
                 return False
 
         except Exception as e:
-            logger.error(f"❌ Error fetching campaigns: {e}")
+            logger.error(f"❌ Error fetching deals: {e}")
             return False
 
     def parse_deal(self, deal_data: Dict) -> Optional[Dict]:
-        """Parse individual campaign from Perx API response"""
+        """Parse individual reward from Perx API response"""
         try:
-            # Extract merchant name if it's an object
-            merchant = deal_data.get('merchant', '')
-            if isinstance(merchant, dict):
-                merchant = merchant.get('name', '')
+            # Extract merchant name
+            merchant = deal_data.get('merchant_name', '')
 
             # Extract category tags if available
             category = 'General'
@@ -160,17 +178,34 @@ class BDOPerxScraper:
             if category_tags and isinstance(category_tags, list) and len(category_tags) > 0:
                 category = category_tags[0].get('title', 'General')
 
-            # Extract campaign ID for direct deal link
-            campaign_id = deal_data.get('id', '')
-            direct_url = f'https://www.deals.bdo.com.ph/treat-welcome/{campaign_id}' if campaign_id else 'https://www.deals.bdo.com.ph'
+            # Extract reward ID for direct deal link - use /deal-welcome/ for rewards
+            reward_id = deal_data.get('id', '')
+            direct_url = f'https://www.deals.bdo.com.ph/deal-welcome/{reward_id}' if reward_id else 'https://www.deals.bdo.com.ph'
 
-            # Map Perx campaign fields to our schema
+            # Extract description - may be in accordions
+            description = deal_data.get('description', '')
+            if not description and deal_data.get('accordions'):
+                # Try to get description from accordions
+                for accordion in deal_data.get('accordions', []):
+                    if accordion.get('title') == 'Promo Details':
+                        description = accordion.get('body', '')
+                        break
+
+            # Extract image URL from images list
+            image_url = ''
+            if deal_data.get('images'):
+                for img in deal_data.get('images', []):
+                    if img.get('type') == 'card' or img.get('type') == 'reward_card':
+                        image_url = img.get('url', '')
+                        break
+
+            # Map Perx reward fields to our schema
             parsed = {
                 'source': 'bdo_perx_api',
                 'card_issuer': 'BDO',
-                'title': deal_data.get('name', deal_data.get('title', '')),
-                'description': deal_data.get('description', ''),
-                'detailed_description': deal_data.get('description', ''),
+                'title': deal_data.get('name', ''),
+                'description': description,
+                'detailed_description': description,
                 'merchant': merchant,
                 'category': category,
                 'card_type': 'Credit Card',
@@ -179,12 +214,12 @@ class BDOPerxScraper:
                 'discount_amount': None,
                 'reward_points': None,
                 'cashback_percent': None,
-                'promotion_start_date': deal_data.get('begins_at', ''),
-                'promotion_end_date': deal_data.get('ends_at', ''),
+                'promotion_start_date': deal_data.get('valid_from', ''),
+                'promotion_end_date': deal_data.get('valid_to', ''),
                 'url': direct_url,
                 'promotion_details': deal_data.get('terms_and_conditions', ''),
-                'image_url': '',
-                'merchant_logo_url': '',
+                'image_url': image_url,
+                'merchant_logo_url': deal_data.get('merchant_logo_url', ''),
                 'data_quality_score': 0.85,
             }
 
@@ -194,7 +229,7 @@ class BDOPerxScraper:
             return None
 
         except Exception as e:
-            logger.warning(f"Error parsing campaign: {e}")
+            logger.warning(f"Error parsing reward: {e}")
             return None
 
     def process_deals(self) -> List[Dict]:

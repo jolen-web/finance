@@ -6,7 +6,7 @@
         <div class="col-md-8 offset-md-2">
             <div class="card">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0"><i class="fas fa-sync-alt"></i> BDO Deals Management</h4>
+                    <h4 class="mb-0"><i class="fas fa-sync-alt"></i> Credit Card Deals Management</h4>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-info">
@@ -15,10 +15,10 @@
                     </div>
 
                     <div class="mb-4">
-                        <h5>Refresh Deals from BDO</h5>
+                        <h5>Refresh Deals from BDO and BPI</h5>
                         <p class="text-muted">
                             Click the button below to fetch the latest credit card promotional campaigns
-                            directly from BDO's Perx API. This will replace the current deals with fresh data.
+                            from BDO's Perx API and BPI's promotions page. This will replace the current deals with fresh data from all sources.
                         </p>
 
                         <button id="refresh-btn" class="btn btn-primary btn-lg">
@@ -26,7 +26,7 @@
                         </button>
                         <span id="loading-spinner" class="ms-2" style="display: none;">
                             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            Fetching fresh data from BDO...
+                            Fetching fresh data from BDO and BPI...
                         </span>
                     </div>
 
@@ -114,6 +114,13 @@ document.getElementById('refresh-btn').addEventListener('click', async function(
             let detailsHTML = '';
             if (isUpdated) {
                 detailsHTML += `<p><strong>Deals Updated:</strong> ${data.data.deals_updated}</p>`;
+
+                // Show source breakdown if available
+                if (data.data.by_source) {
+                    detailsHTML += `<p><strong>Deals by Source:</strong><br/>`;
+                    detailsHTML += `&nbsp;&nbsp;• <strong>BDO:</strong> ${data.data.by_source.BDO || 0} deals<br/>`;
+                    detailsHTML += `&nbsp;&nbsp;• <strong>BPI:</strong> ${data.data.by_source.BPI || 0} deals</p>`;
+                }
             } else if (data.data.deals_maintained) {
                 detailsHTML += `<p><strong>Deals Maintained:</strong> ${data.data.deals_maintained}</p>`;
                 detailsHTML += `<p><em>${data.data.note || 'Using cached deals while API is unavailable'}</em></p>`;
@@ -155,7 +162,7 @@ async function loadStats() {
 
             // Update status text
             document.getElementById('status-text').innerHTML = `
-                <strong>${stats.total_deals} deals</strong> currently loaded from BDO
+                <strong>${stats.total_deals} deals</strong> currently loaded from BDO and BPI
             `;
         }
     } catch (error) {

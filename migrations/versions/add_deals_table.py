@@ -1,7 +1,7 @@
 """Add deals table for credit card promotions
 
 Revision ID: deals_001
-Revises:
+Revises: ee00a836339c
 Create Date: 2025-11-09 11:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'deals_001'
-down_revision = 'enhance_regex_patterns'
+down_revision = 'ee00a836339c'
 branch_labels = None
 depends_on = None
 

@@ -1,7 +1,7 @@
 """Enhance regex_patterns table with tracking and example fields.
 
 Revision ID: enhance_regex_patterns
-Revises: add_gemini_api_key
+Revises: add_feedback
 Create Date: 2025-11-02 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'enhance_regex_patterns'
-down_revision = 'add_gemini_api_key'
+down_revision = 'add_feedback'
 branch_labels = None
 depends_on = None
 

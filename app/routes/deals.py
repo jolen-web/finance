@@ -240,27 +240,50 @@ def get_stats():
 @csrf.exempt
 def refresh_deals():
     """
-    Admin endpoint to refresh deals from BDO API
+    Admin endpoint to refresh deals from multiple sources (BDO, BPI, etc.)
 
-    This fetches the latest promotional campaigns from BDO's backend
+    This fetches the latest promotional campaigns from BDO and BPI
     and updates the database with fresh data.
     """
     try:
         from services.deals.scrapers.bdo_perx_api_scraper import BDOPerxScraper
+        from services.deals.scrapers.bpi_promos_scraper import BPIPromosScraper
         import logging
 
         logger = logging.getLogger(__name__)
 
-        # Fetch fresh data from BDO
-        scraper = BDOPerxScraper()
-        fresh_deals = scraper.scrape()
+        # Fetch fresh data from multiple sources
+        all_fresh_deals = []
+        scraper_results = {}
 
-        if fresh_deals:
+        # 1. Try BDO Scraper
+        logger.info("Scraping BDO deals...")
+        bdo_scraper = BDOPerxScraper()
+        bdo_deals = bdo_scraper.scrape()
+        scraper_results['BDO'] = len(bdo_deals) if bdo_deals else 0
+        if bdo_deals:
+            all_fresh_deals.extend(bdo_deals)
+            logger.info(f"✅ BDO scraper: {len(bdo_deals)} deals")
+        else:
+            logger.warning("⚠️ BDO scraper returned no deals")
+
+        # 2. Try BPI Scraper
+        logger.info("Scraping BPI deals...")
+        bpi_scraper = BPIPromosScraper()
+        bpi_deals = bpi_scraper.scrape()
+        scraper_results['BPI'] = len(bpi_deals) if bpi_deals else 0
+        if bpi_deals:
+            all_fresh_deals.extend(bpi_deals)
+            logger.info(f"✅ BPI scraper: {len(bpi_deals)} deals")
+        else:
+            logger.warning("⚠️ BPI scraper returned no deals")
+
+        if all_fresh_deals:
             # Successfully fetched new deals - replace old ones
             Deal.query.delete()
             db.session.commit()
 
-            for deal_data in fresh_deals:
+            for deal_data in all_fresh_deals:
                 deal = Deal(**deal_data)
                 db.session.add(deal)
 
@@ -268,25 +291,27 @@ def refresh_deals():
 
             return jsonify({
                 'success': True,
-                'message': f'Successfully refreshed {len(fresh_deals)} deals from BDO',
+                'message': f'Successfully refreshed {len(all_fresh_deals)} deals from multiple sources',
                 'data': {
-                    'deals_updated': len(fresh_deals),
+                    'deals_updated': len(all_fresh_deals),
+                    'by_source': scraper_results,
                     'timestamp': __import__('datetime').datetime.utcnow().isoformat()
                 }
             }), 200
         else:
-            # API failed - keep existing deals and return graceful message
+            # All scrapers failed - keep existing deals and return graceful message
             current_count = Deal.query.filter(Deal.is_active == True).count()
-            logger.warning(f"BDO API fetch failed, but maintaining {current_count} existing deals")
+            logger.warning(f"All scrapers failed, but maintaining {current_count} existing deals")
 
             return jsonify({
                 'success': True,
-                'message': f'BDO API temporarily unavailable. Showing {current_count} existing deals.',
+                'message': f'Deal scrapers temporarily unavailable. Showing {current_count} existing deals.',
                 'data': {
                     'deals_updated': 0,
                     'deals_maintained': current_count,
+                    'by_source': scraper_results,
                     'timestamp': __import__('datetime').datetime.utcnow().isoformat(),
-                    'note': 'Displaying existing cached deals while API is unavailable'
+                    'note': 'Displaying existing cached deals while scrapers are unavailable'
                 }
             }), 200
 

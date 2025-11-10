@@ -1,7 +1,7 @@
 """Add gemini_api_key column to users table.
 
 Revision ID: add_gemini_api_key
-Revises: add_feedback
+Revises: enhance_regex_patterns
 Create Date: 2025-11-02 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_gemini_api_key'
-down_revision = 'add_feedback'
+down_revision = 'enhance_regex_patterns'
 branch_labels = None
 depends_on = None
 
