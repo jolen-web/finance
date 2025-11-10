@@ -44,7 +44,7 @@ try:
 
             # Try upgrade again
             import subprocess
-            result = subprocess.run(['/app/.venv/bin/python', '-m', 'flask', 'db', 'upgrade'],
+            result = subprocess.run(['python', '-m', 'flask', 'db', 'upgrade'],
                                   env=dict(os.environ, FLASK_APP='app'))
             if result.returncode == 0:
                 print("Migration successful after consolidation!")
