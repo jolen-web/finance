@@ -78,6 +78,24 @@ def create_app(config_class=Config):
     app.register_blueprint(feedback.feedback_bp)
     app.register_blueprint(deals.deals_bp)
 
+    # Fallback: Ensure all tables exist, even if migrations failed
+    # This is a safety net for deployment edge cases with conflicting migrations
+    with app.app_context():
+        try:
+            # Check if deals table exists, if not create all tables
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            existing_tables = inspector.get_table_names()
+
+            if 'deals' not in existing_tables:
+                app.logger.warning("Deals table not found. Creating all missing tables...")
+                db.create_all()
+                app.logger.info("Database tables created/verified successfully")
+        except Exception as e:
+            app.logger.error(f"Error verifying/creating tables: {e}", exc_info=True)
+            # Don't fail startup, continue anyway - migrations may still be running
+            pass
+
     # Ensure data directory exists
     import os
     data_dir = os.path.join(app.root_path, '..', 'data')

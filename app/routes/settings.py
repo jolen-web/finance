@@ -504,7 +504,12 @@ def api_configuration():
                 return redirect(url_for('settings.api_configuration'))
 
             from app.services.receipt_ocr import validate_gemini_api_key
-            is_valid, error_msg = validate_gemini_api_key(current_user.gemini_api_key)
+            # Decrypt the key before validation (gemini_api_key is stored encrypted)
+            decrypted_key = current_user.get_gemini_api_key()
+            if not decrypted_key:
+                flash('Failed to decrypt stored API key', 'danger')
+                return redirect(url_for('settings.api_configuration'))
+            is_valid, error_msg = validate_gemini_api_key(decrypted_key)
 
             if is_valid:
                 flash('API key is valid and working!', 'success')
