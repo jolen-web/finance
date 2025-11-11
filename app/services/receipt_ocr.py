@@ -1255,34 +1255,50 @@ CRITICAL RULES:
         # Check if file is PDF
         is_pdf = filepath.lower().endswith('.pdf')
 
-        # Try to extract using Gemini first (more intelligent) - for images only
+        # Extract text using OCR/PDF first (Tesseract priority)
         parsed_data = None
-        gemini_used = False
+        extraction_method = None
         ocr_text = None
 
-        if not is_pdf and GEMINI_AVAILABLE:
-            parsed_data, error = self.extract_with_gemini(filepath)
-            if parsed_data and error is None:
-                gemini_used = True
+        if is_pdf:
+            # Extract text from PDF
+            logger.info("🔹 Using PDF text extraction (pdfplumber)...")
+            ocr_text, error = self.extract_text_from_pdf(filepath, password)
+            if error:
+                # Check if password is required
+                if error == "PDF_PASSWORD_REQUIRED":
+                    return None, "PDF_PASSWORD_REQUIRED"
+                return None, error
+            extraction_method = 'pdf_extraction'
+        else:
+            # Perform Tesseract OCR on image
+            logger.info("🔹 Using Tesseract OCR...")
+            ocr_text, error = self.extract_text_from_image(filepath)
+            if error:
+                return None, error
+            extraction_method = 'tesseract_ocr'
 
-        # Fall back to traditional OCR/PDF extraction if Gemini not available or failed
-        if not parsed_data:
-            if is_pdf:
-                # Extract text from PDF
-                ocr_text, error = self.extract_text_from_pdf(filepath, password)
-                if error:
-                    # Check if password is required
-                    if error == "PDF_PASSWORD_REQUIRED":
-                        return None, "PDF_PASSWORD_REQUIRED"
-                    return None, error
-            else:
-                # Perform OCR on image
-                ocr_text, error = self.extract_text_from_image(filepath)
-                if error:
-                    return None, error
-
-            # Parse receipt data using regex patterns
+        # Try regex parsing with extracted text first
+        if ocr_text and len(ocr_text.strip()) > 0:
+            logger.info("📊 Attempting regex pattern matching on extracted text...")
             parsed_data = self.parse_receipt_data(ocr_text)
+            if parsed_data and parsed_data.get('line_items'):
+                logger.info(f"✓ Regex parsing successful, extracted {len(parsed_data.get('line_items', []))} items")
+                parsed_data['_extraction_method'] = f'{extraction_method}_with_regex'
+            else:
+                logger.warning("⚠ Regex parsing returned no items, trying Gemini...")
+                parsed_data = None
+
+        # Fall back to Gemini only if regex extraction failed or returned no results
+        if not parsed_data and GEMINI_AVAILABLE and not is_pdf:
+            logger.info("🚀 Regex failed, falling back to Gemini Vision API...")
+            gemini_data, error = self.extract_with_gemini(filepath)
+            if gemini_data and error is None:
+                parsed_data = gemini_data
+                parsed_data['_extraction_method'] = 'gemini_vision'
+                logger.info(f"✓ Gemini Vision successful, extracted {len(parsed_data.get('line_items', []))} items")
+            else:
+                logger.warning(f"✗ Gemini Vision also failed: {error}")
 
         # Determine the extracted amount
         extracted_amount = parsed_data.get('amount')
@@ -1307,13 +1323,6 @@ CRITICAL RULES:
 
         db.session.add(receipt)
         db.session.commit()
-
-        # Add note about extraction method
-        if gemini_used:
-            parsed_data['_extraction_method'] = 'gemini'
-            parsed_data['tax_deductible'] = parsed_data.get('tax_deductible')
-            parsed_data['category'] = parsed_data.get('category')
-            parsed_data['warranty_info'] = parsed_data.get('warranty_info')
 
         return receipt, parsed_data
 

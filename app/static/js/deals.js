@@ -613,6 +613,21 @@ class DealsWidget {
             }
 
             // Show consistent content across all cards: title, merchant, category, discount
+            let branchHTML = '';
+            if (deal.participating_branches && deal.participating_branches.length > 0) {
+                branchHTML = `
+                    <div style="
+                        margin-top: 0.5rem;
+                        padding-top: 0.5rem;
+                        border-top: 1px solid rgba(255,255,255,0.2);
+                        font-size: 0.7rem;
+                        color: rgba(255,255,255,0.8);
+                    ">
+                        📍 ${deal.participating_branches.length} location${deal.participating_branches.length > 1 ? 's' : ''}
+                    </div>
+                `;
+            }
+
             const contentHTML = `
                 <h3 style="
                     margin: 0 0 0.25rem 0;
@@ -659,6 +674,7 @@ class DealsWidget {
                         white-space: nowrap;
                     ">${discountLabel}</span>
                 </div>
+                ${branchHTML}
             `;
 
             cardContent.innerHTML = contentHTML;

@@ -10,6 +10,8 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import argparse
 import json
+from bs4 import BeautifulSoup
+import re
 
 logging.basicConfig(
     level=logging.INFO,
@@ -123,6 +125,77 @@ class BPIPromosScraper:
 
         return items
 
+    def _extract_branches_from_detail_page(self, url: str, category: str) -> List[str]:
+        """Extract participating branches from deal detail page"""
+        try:
+            # Only fetch detail page for restaurant/dining deals to save bandwidth
+            restaurant_keywords = ['restaurant', 'dining', 'food', 'cafe', 'burger', 'pizza', 'seafood']
+            is_restaurant = any(keyword in category.lower() for keyword in restaurant_keywords)
+
+            if not is_restaurant:
+                return []
+
+            logger.debug(f"📄 Fetching detail page for branch info: {url}")
+            response = self.session.get(url, timeout=10)
+
+            if response.status_code != 200:
+                logger.debug(f"⚠️  Could not fetch detail page: {response.status_code}")
+                return []
+
+            soup = BeautifulSoup(response.content, 'html.parser')
+            full_text = response.text
+
+            branches = []
+
+            # Look for branch-related content in the HTML
+            # Pattern 1: Extract from structured data (JSON-LD)
+            scripts = soup.find_all('script', type='application/ld+json')
+            for script in scripts:
+                try:
+                    data = json.loads(script.string)
+                    if isinstance(data, dict):
+                        # Check for PostalAddress or Location fields
+                        if 'streetAddress' in data:
+                            address = data.get('streetAddress', '')
+                            if address and address not in branches:
+                                branches.append(address)
+                except (json.JSONDecodeError, AttributeError):
+                    continue
+
+            # Pattern 2: Look for branch list in text content
+            # Search for lines containing "branch", "location", "venue" with address patterns
+            lines = full_text.split('\n')
+            for i, line in enumerate(lines):
+                line_clean = line.strip()
+
+                # Look for common branch indicators
+                if any(keyword in line_clean.lower() for keyword in ['branch', 'venue', 'location', 'outlet']):
+                    # Get surrounding context
+                    context_start = max(0, i - 1)
+                    context_end = min(len(lines), i + 3)
+
+                    for j in range(context_start, context_end):
+                        context_line = BeautifulSoup(lines[j], 'html.parser').get_text(strip=True)
+
+                        # Look for address-like patterns (street names, floor numbers, etc.)
+                        if context_line and len(context_line) > 10:
+                            # Filter for address-like content
+                            if any(addr_keyword in context_line.lower() for addr_keyword in ['st.', 'ave', 'blvd', 'floor', 'f.', '#', 'no.']):
+                                if context_line not in branches and context_line not in [BeautifulSoup(b, 'html.parser').get_text() for b in branches]:
+                                    branches.append(context_line)
+
+            # Deduplicate and clean
+            cleaned_branches = list(dict.fromkeys([b.strip() for b in branches if b.strip()]))
+
+            if cleaned_branches:
+                logger.debug(f"✓ Found {len(cleaned_branches)} branches: {cleaned_branches[:2]}")
+
+            return cleaned_branches[:20]  # Limit to 20 branches per deal
+
+        except Exception as e:
+            logger.debug(f"⚠️  Error extracting branches: {e}")
+            return []
+
     def _parse_api_item(self, item: Dict) -> Optional[Dict]:
         """Parse individual promo item from API response"""
         try:
@@ -212,6 +285,9 @@ class BPIPromosScraper:
             start_date = item.get('date', '')  # Publication date
             end_date = item.get('promoExpiryDate', '')  # Expiry date
 
+            # Extract participating branches from detail page
+            branches = self._extract_branches_from_detail_page(url, category)
+
             promo_data = {
                 'source': 'bpi_promos',
                 'card_issuer': 'BPI',
@@ -231,6 +307,7 @@ class BPIPromosScraper:
                 'promotion_details': '',
                 'image_url': image_url,
                 'merchant_logo_url': '',
+                'participating_branches': json.dumps(branches) if branches else None,
                 'data_quality_score': 0.85,
             }
 

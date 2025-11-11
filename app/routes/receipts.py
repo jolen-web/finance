@@ -74,7 +74,17 @@ def upload(transaction_id):
 
             db.session.commit()
 
-        flash(f'Receipt uploaded and processed successfully! Found: {len(parsed_data.get("items", []))} items', 'success')
+        # Build success message with extraction method details
+        extraction_method = parsed_data.get('_extraction_method', 'unknown')
+        method_display = {
+            'tesseract_ocr_with_regex': '✓ Extracted with Tesseract OCR + Regex patterns',
+            'pdf_extraction_with_regex': '✓ Extracted from PDF + Regex patterns',
+            'gemini_vision': '🚀 Extracted with Gemini Vision API',
+            'regex': '✓ Extracted with Regex patterns'
+        }.get(extraction_method, f'✓ Extracted ({extraction_method})')
+
+        item_count = len(parsed_data.get('items', []))
+        flash(f'{method_display} - Found {item_count} items', 'success')
         return redirect(url_for('transactions.list_transactions'))
 
     return render_template('receipts/upload.html', transaction=transaction)

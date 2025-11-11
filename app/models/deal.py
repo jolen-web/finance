@@ -34,6 +34,7 @@ class Deal(db.Model):
     image_url = db.Column(db.String(500))  # Image URL for the deal
     merchant_logo_url = db.Column(db.String(500))  # Merchant/card issuer logo
     data_quality_score = db.Column(db.Float, default=0.5)  # 0-1 quality score
+    participating_branches = db.Column(db.Text)  # JSON string of participating branches/locations
 
     # Metadata
     scraped_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -46,6 +47,15 @@ class Deal(db.Model):
 
     def to_dict(self):
         """Convert deal to dictionary for JSON serialization"""
+        import json
+
+        participating_branches = []
+        if self.participating_branches:
+            try:
+                participating_branches = json.loads(self.participating_branches)
+            except (json.JSONDecodeError, TypeError):
+                participating_branches = [self.participating_branches]
+
         return {
             'id': self.id,
             'source': self.source,
@@ -71,6 +81,7 @@ class Deal(db.Model):
             'url': self.url,
             'image_url': self.image_url,
             'merchant_logo_url': self.merchant_logo_url,
+            'participating_branches': participating_branches,
             'quality_score': self.data_quality_score,
             'scraped_at': self.scraped_at.isoformat() if self.scraped_at else None,
             'is_active': self.is_active,
