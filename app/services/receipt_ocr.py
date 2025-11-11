@@ -444,12 +444,24 @@ CRITICAL RULES:
             logger.error(f"Gemini Text extraction failed ({error_type}): {error_str[:100]}")
             return None, f"Gemini text parsing error: {error_str[:100]}"
 
-    def extract_with_gemini(self, image_path):
-        """Extract receipt data using Gemini Vision API for intelligent analysis"""
-        if not GEMINI_AVAILABLE:
+    def extract_with_gemini(self, image_path, api_key=None):
+        """Extract receipt data using Gemini Vision API for intelligent analysis
+
+        Args:
+            image_path (str): Path to the image file
+            api_key (str, optional): Specific API key to use (defaults to configured key)
+        """
+        if not GEMINI_AVAILABLE and not api_key:
             return None, "Gemini API not available"
 
         try:
+            # Use provided API key or fall back to configured one
+            import google.generativeai as genai_local
+            if api_key:
+                genai_local.configure(api_key=api_key)
+            elif not GEMINI_AVAILABLE:
+                return None, "Gemini API not available"
+
             # Read image and convert to base64
             with open(image_path, 'rb') as img_file:
                 image_data = base64.standard_b64encode(img_file.read()).decode('utf-8')
@@ -490,7 +502,7 @@ CRITICAL RULES:
 
             # Call Gemini API
             # Use the base model name for vision tasks
-            model = genai.GenerativeModel('gemini-2.0-flash')
+            model = genai_local.GenerativeModel('gemini-2.0-flash')
             image_content = {
                 'mime_type': media_type,
                 'data': image_data
@@ -1128,10 +1140,13 @@ CRITICAL RULES:
         api_key_invalid = False
         gemini_error_msg = None
 
-        if GEMINI_AVAILABLE:
+        # Check if Gemini is available (either environment or user-configured API key)
+        gemini_available = GEMINI_AVAILABLE or (user_api_key is not None)
+
+        if gemini_available:
             if not is_pdf:
                 logger.info("Attempting to parse with Gemini Vision API (image input)...")
-                gemini_data, gemini_error = self.extract_with_gemini(filepath)
+                gemini_data, gemini_error = self.extract_with_gemini(filepath, api_key=user_api_key)
                 if gemini_data and not gemini_error:
                     if gemini_data.get('line_items'):
                         parsed_data = gemini_data
@@ -1290,15 +1305,22 @@ CRITICAL RULES:
                 parsed_data = None
 
         # Fall back to Gemini only if regex extraction failed or returned no results
-        if not parsed_data and GEMINI_AVAILABLE and not is_pdf:
-            logger.info("🚀 Regex failed, falling back to Gemini Vision API...")
-            gemini_data, error = self.extract_with_gemini(filepath)
-            if gemini_data and error is None:
-                parsed_data = gemini_data
-                parsed_data['_extraction_method'] = 'gemini_vision'
-                logger.info(f"✓ Gemini Vision successful, extracted {len(parsed_data.get('line_items', []))} items")
-            else:
-                logger.warning(f"✗ Gemini Vision also failed: {error}")
+        if not parsed_data and not is_pdf:
+            # Extract user's API key if available
+            from flask import g
+            user = g.get('user', None) if hasattr(g, 'get') else None
+            user_api_key = get_active_gemini_api_key(user) if user else None
+            gemini_available = GEMINI_AVAILABLE or (user_api_key is not None)
+
+            if gemini_available:
+                logger.info("🚀 Regex failed, falling back to Gemini Vision API...")
+                gemini_data, error = self.extract_with_gemini(filepath, api_key=user_api_key)
+                if gemini_data and error is None:
+                    parsed_data = gemini_data
+                    parsed_data['_extraction_method'] = 'gemini_vision'
+                    logger.info(f"✓ Gemini Vision successful, extracted {len(parsed_data.get('line_items', []))} items")
+                else:
+                    logger.warning(f"✗ Gemini Vision also failed: {error}")
 
         # Determine the extracted amount
         extracted_amount = parsed_data.get('amount')
