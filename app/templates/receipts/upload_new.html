@@ -92,26 +92,27 @@ tr:has(.transaction-checkbox:checked) {
 /* Mobile-responsive modal layout - stack vertically on smaller screens */
 @media (max-width: 992px) {
     .statement-review-body {
-        flex-direction: column !important;
-        flex-wrap: wrap !important;
+        display: block !important;
     }
 
-    /* Transactions column displays first (order 1) and takes most space */
+    /* Transactions column - full width, scrollable */
     .transactions-column {
-        order: 1;
-        flex: 1 1 100% !important;
-        min-height: 300px;
+        width: 100% !important;
+        flex: none !important;
+        margin-bottom: 1rem;
+        min-height: auto;
     }
 
-    /* Receipt column displays last (order 2) with fixed height */
+    /* Receipt column - full width, fixed height */
     .receipt-column {
-        order: 2;
-        flex: 0 0 auto !important;
-        max-height: 300px;
+        width: 100% !important;
+        flex: none !important;
+        margin: 0 !important;
     }
 
     .receipt-column > div {
         max-height: 300px !important;
+        overflow-y: auto;
     }
 
     /* Reduce padding on mobile for more space */
