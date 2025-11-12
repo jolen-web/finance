@@ -88,6 +88,43 @@ tr:has(.transaction-checkbox:checked) {
 #preview-area.loading img {
     opacity: 0.7;
 }
+
+/* Mobile-responsive modal layout - stack vertically on smaller screens */
+@media (max-width: 992px) {
+    .statement-review-body {
+        flex-direction: column !important;
+        flex-wrap: wrap !important;
+    }
+
+    /* Transactions column displays first (order 1) and takes most space */
+    .transactions-column {
+        order: 1;
+        flex: 1 1 100% !important;
+        min-height: 300px;
+    }
+
+    /* Receipt column displays last (order 2) with fixed height */
+    .receipt-column {
+        order: 2;
+        flex: 0 0 auto !important;
+        max-height: 300px;
+    }
+
+    .receipt-column > div {
+        max-height: 300px !important;
+    }
+
+    /* Reduce padding on mobile for more space */
+    .modal-body {
+        padding: 1rem !important;
+    }
+}
+
+/* Ensure modal body is scrollable on all screens */
+.statement-review-body {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
 </style>
 {% endblock %}
 
@@ -215,21 +252,9 @@ tr:has(.transaction-checkbox:checked) {
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" style="display: flex; flex-wrap: nowrap; gap: 1rem;">
-                <!-- Receipt Image Column -->
-                <div style="flex: 0 0 35%; display: flex; flex-direction: column; min-width: 0;">
-                    <h6 class="mb-2"><i class="fas fa-image me-2"></i>Receipt</h6>
-                    <div style="flex: 1; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; background: #f8f9fa; overflow-y: auto; min-height: 300px;">
-                        <img id="modalPreviewImage" src="" alt="Receipt preview" style="max-width: 100%; height: auto; border-radius: 4px; display: none;">
-                        <div id="noImagePlaceholder" style="text-align: center; color: #999; padding: 40px 20px;">
-                            <i class="fas fa-image" style="font-size: 48px; display: block; margin-bottom: 10px; color: #ddd;"></i>
-                            <small>Receipt image will appear here</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Transactions Column -->
-                <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+            <div class="modal-body statement-review-body" style="display: flex; flex-wrap: nowrap; gap: 1rem;">
+                <!-- Transactions Column (displayed first on mobile) -->
+                <div class="transactions-column" style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
                         <!-- Statement Summary -->
                         <div id="statementSummary" class="alert alert-info mb-3" style="display: none;">
                             <h6><i class="fas fa-chart-line"></i> Statement Summary</h6>
@@ -321,6 +346,18 @@ tr:has(.transaction-checkbox:checked) {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receipt Image Column (displayed last on mobile) -->
+                <div class="receipt-column" style="flex: 0 0 35%; display: flex; flex-direction: column; min-width: 0;">
+                    <h6 class="mb-2"><i class="fas fa-image me-2"></i>Receipt</h6>
+                    <div style="flex: 1; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; background: #f8f9fa; overflow-y: auto; min-height: 300px;">
+                        <img id="modalPreviewImage" src="" alt="Receipt preview" style="max-width: 100%; height: auto; border-radius: 4px; display: none;">
+                        <div id="noImagePlaceholder" style="text-align: center; color: #999; padding: 40px 20px;">
+                            <i class="fas fa-image" style="font-size: 48px; display: block; margin-bottom: 10px; color: #ddd;"></i>
+                            <small>Receipt image will appear here</small>
                         </div>
                     </div>
                 </div>
