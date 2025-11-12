@@ -150,19 +150,39 @@ def bulk_import():
             return jsonify({'error': 'Access denied'}), 403
 
         imported_count = 0
-        for trans_data in transactions_data:
+        skipped_count = 0
+        for i, trans_data in enumerate(transactions_data):
             # Validate required fields
             if not trans_data.get('date') or not trans_data.get('amount') or not trans_data.get('description'):
+                skipped_count += 1
+                current_app.logger.warning(f"Transaction {i} skipped - missing required fields. Date: {trans_data.get('date')}, Amount: {trans_data.get('amount')}, Description: {trans_data.get('description')}")
                 continue  # Skip incomplete records
 
             try:
                 # Parse date string if needed
                 trans_date = trans_data['date']
+                current_app.logger.debug(f"Transaction {i}: Original date: {trans_date} (type: {type(trans_date).__name__})")
+
                 if isinstance(trans_date, str):
-                    trans_date = datetime.strptime(trans_date, '%Y-%m-%d').date()
+                    try:
+                        trans_date = datetime.strptime(trans_date, '%Y-%m-%d').date()
+                        current_app.logger.debug(f"Transaction {i}: Parsed date to {trans_date}")
+                    except ValueError as e:
+                        current_app.logger.error(f"Transaction {i}: Failed to parse date '{trans_date}' with format '%Y-%m-%d': {str(e)}")
+                        skipped_count += 1
+                        continue
 
                 # Parse amount
-                amount = float(trans_data['amount'])
+                amount_raw = trans_data['amount']
+                current_app.logger.debug(f"Transaction {i}: Original amount: {amount_raw} (type: {type(amount_raw).__name__})")
+
+                try:
+                    amount = float(amount_raw)
+                    current_app.logger.debug(f"Transaction {i}: Parsed amount to {amount}")
+                except (ValueError, TypeError) as e:
+                    current_app.logger.error(f"Transaction {i}: Failed to parse amount '{amount_raw}': {str(e)}")
+                    skipped_count += 1
+                    continue
 
                 # Parse category_id
                 category_id = trans_data.get('category_id')
@@ -197,10 +217,14 @@ def bulk_import():
 
                 db.session.add(transaction)
                 imported_count += 1
+                current_app.logger.info(f"Transaction {i}: ✓ Created transaction #{imported_count} - {trans_data.get('description')} on {trans_date} for {abs_amount}")
             except Exception as e:
                 # Log error but continue with other transactions
-                current_app.logger.warning(f"Error importing transaction from {trans_data.get('description', 'Unknown')}: {str(e)}")
+                skipped_count += 1
+                current_app.logger.warning(f"Transaction {i} error - {trans_data.get('description', 'Unknown')}: {str(e)}", exc_info=True)
                 continue
+
+        current_app.logger.info(f"Transaction processing summary: {imported_count} imported, {skipped_count} skipped out of {len(transactions_data)} total")
 
         # Update account balance
         try:
