@@ -637,9 +637,9 @@ CRITICAL RULES:
 
             if description and (parsed_date or date_str):
                 transactions.append({
-                    'date': parsed_date,
+                    'date': parsed_date.isoformat() if isinstance(parsed_date, datetime.date) else date_str,
                     'description': description,
-                    'amount': amount
+                    'amount': float(amount)  # Convert Decimal to float for JSON serialization
                 })
                 logger.info(f"  Column match {i+1}: {parsed_date} | {description} | {amount}")
 
@@ -892,9 +892,9 @@ CRITICAL RULES:
                                 logger.debug(f"Could not record pattern success: {str(e)}")
 
                         transactions.append({
-                            'date': parsed_date,
+                            'date': parsed_date.isoformat() if isinstance(parsed_date, datetime.date) else None,
                             'description': description_clean,
-                            'amount': amount
+                            'amount': float(amount)  # Convert Decimal to float for JSON serialization
                         })
                         logger.info(f"  → Added transaction: {parsed_date} | {description_clean} | {amount}")
                         break  # Found match, don't try other patterns
@@ -967,7 +967,7 @@ CRITICAL RULES:
             # If we found all three pieces of info, create a transaction
             if receipt_date and total_amount and merchant_name:
                 transactions.append({
-                    'date': receipt_date,
+                    'date': receipt_date.isoformat() if isinstance(receipt_date, datetime.date) else receipt_date,
                     'description': merchant_name,
                     'amount': total_amount  # Keep as negative for charges (consistent with statement parsing)
                 })
